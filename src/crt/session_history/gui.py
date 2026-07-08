@@ -29,7 +29,7 @@ class SessionHistoryDialog(QDialog):
 
         self.list_widget = QListWidget()
         self.list_widget.setObjectName("session_history")
-        self.list_widget.setFont(QFont("Helvetica", 12))
+        self.list_widget.setFont(QFont("Segoe UI", 12))
         for path in past_file_paths:
             self.list_widget.addItem(QListWidgetItem(path))
         layout.addWidget(self.list_widget)

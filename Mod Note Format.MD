@@ -18,5 +18,3 @@
 `Mod Note {time_without_loads} without loads, and {time_with_loads} with loads at {fps} FPS using {plug}`
 Formats to
 `Mod Note 30.000 without loads, and 45.00 with loads at 60 FPS using [Conner's Retime Tool](https://github.com/connerglover/conners-retime-tool)`
-
-*This feature is stolen from JRT*

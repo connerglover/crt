@@ -29,7 +29,8 @@ class SettingsDialog(QDialog):
 
         # Title
         title = QLabel(c["CRT Settings"])
-        title.setFont(QFont("Helvetica", 18, QFont.Weight.Bold))
+        title.setProperty("cssClass", "heading")
+        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         layout.addWidget(title)
 
         # Enable updates checkbox
@@ -39,7 +40,7 @@ class SettingsDialog(QDialog):
         self.enable_updates = QCheckBox(c["Automatically Check for Updates"])
         self.enable_updates.setObjectName("enable_updates")
         self.enable_updates.setChecked(settings.get("enable_updates", True))
-        self.enable_updates.setFont(QFont("Helvetica", 12))
+        self.enable_updates.setFont(QFont("Segoe UI", 12))
         row0.addWidget(self.enable_updates)
         layout.addLayout(row0)
 
@@ -49,11 +50,11 @@ class SettingsDialog(QDialog):
         spacer1 = QWidget(); spacer1.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         row1.addWidget(spacer1)
         lbl_theme = QLabel(c["Theme"])
-        lbl_theme.setFont(QFont("Helvetica", 13))
+        lbl_theme.setFont(QFont("Segoe UI", 13))
         row1.addWidget(lbl_theme)
         self.theme = QComboBox()
         self.theme.setObjectName("theme")
-        self.theme.setFont(QFont("Helvetica", 12))
+        self.theme.setFont(QFont("Segoe UI", 12))
         self.theme.addItems([c["Automatic"], c["Dark"], c["Light"]])
         current_theme = settings.get("theme", "Automatic")
         # Try to match stored English value to localized display
@@ -70,11 +71,11 @@ class SettingsDialog(QDialog):
         spacer2 = QWidget(); spacer2.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         row2.addWidget(spacer2)
         lbl_lang = QLabel(c["Language"])
-        lbl_lang.setFont(QFont("Helvetica", 13))
+        lbl_lang.setFont(QFont("Segoe UI", 13))
         row2.addWidget(lbl_lang)
         self.language = QComboBox()
         self.language.setObjectName("language")
-        self.language.setFont(QFont("Helvetica", 12))
+        self.language.setFont(QFont("Segoe UI", 12))
         self.language.addItems(["English", "Español", "Français", "Polski"])
         lang_map = {"en": "English", "es": "Español", "fr": "Français", "pl": "Polski"}
         stored_lang = settings.get("language", "en")
@@ -91,11 +92,11 @@ class SettingsDialog(QDialog):
         spacer3 = QWidget(); spacer3.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         row3.addWidget(spacer3)
         lbl_mod = QLabel(c["Mod Note Format"])
-        lbl_mod.setFont(QFont("Helvetica", 13))
+        lbl_mod.setFont(QFont("Segoe UI", 13))
         row3.addWidget(lbl_mod)
         self.mod_note_format = QLineEdit(settings.get("mod_note_format", ""))
         self.mod_note_format.setObjectName("mod_note_format")
-        self.mod_note_format.setFont(QFont("Helvetica", 11))
+        self.mod_note_format.setFont(QFont("Segoe UI", 11))
         self.mod_note_format.setMinimumWidth(220)
         row3.addWidget(self.mod_note_format)
         layout.addLayout(row3)
@@ -113,10 +114,11 @@ class SettingsDialog(QDialog):
         self.btn_restore.setObjectName("Restore Defaults")
         self.btn_apply = QPushButton(c["Apply"])
         self.btn_apply.setObjectName("Apply")
+        self.btn_apply.setProperty("cssClass", "primary")
         self.btn_cancel = QPushButton(c["Cancel"])
         self.btn_cancel.setObjectName("Cancel")
         for btn in (self.btn_restore, self.btn_apply, self.btn_cancel):
-            btn.setFont(QFont("Helvetica", 12))
+            btn.setFont(QFont("Segoe UI", 12))
             btn.setMinimumHeight(34)
             btn_row.addWidget(btn)
         layout.addLayout(btn_row)

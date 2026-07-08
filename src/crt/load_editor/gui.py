@@ -34,7 +34,8 @@ class LoadEditorDialog(QDialog):
 
         # Title
         title = QLabel(c["Edit Load"])
-        title.setFont(QFont("Helvetica", 18, QFont.Weight.Bold))
+        title.setProperty("cssClass", "heading")
+        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         layout.addWidget(title)
 
         # Start frame row
@@ -48,10 +49,11 @@ class LoadEditorDialog(QDialog):
         btn_row.setSpacing(8)
         self.btn_save = QPushButton(c["Save Edits"])
         self.btn_save.setObjectName("Save Edits")
+        self.btn_save.setProperty("cssClass", "primary")
         self.btn_discard = QPushButton(c["Discard Changes"])
         self.btn_discard.setObjectName("Discard Changes")
         for btn in (self.btn_save, self.btn_discard):
-            btn.setFont(QFont("Helvetica", 12))
+            btn.setFont(QFont("Segoe UI", 12))
             btn.setMinimumHeight(34)
             btn_row.addWidget(btn)
         layout.addLayout(btn_row)
@@ -67,22 +69,23 @@ class LoadEditorDialog(QDialog):
         row.addWidget(spacer)
 
         lbl = QLabel(label_text)
-        lbl.setFont(QFont("Helvetica", 13))
+        lbl.setFont(QFont("Segoe UI", 13))
         lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl.setMinimumWidth(120)
         row.addWidget(lbl)
 
         inp = QLineEdit(default)
         inp.setObjectName(key)
-        inp.setFont(QFont("Helvetica", 13))
+        inp.setFont(QFont("Segoe UI", 13))
         inp.setFixedWidth(130)
         inp.setFixedHeight(30)
         row.addWidget(inp)
 
         paste_btn = QPushButton(paste_label)
         paste_btn.setObjectName(f"{key}_paste")
-        paste_btn.setFont(QFont("Helvetica", 9))
-        paste_btn.setFixedWidth(54)
+        paste_btn.setProperty("cssClass", "compact")
+        paste_btn.setFont(QFont("Segoe UI", 10))
+        paste_btn.setFixedWidth(58)
         paste_btn.setFixedHeight(30)
         row.addWidget(paste_btn)
 

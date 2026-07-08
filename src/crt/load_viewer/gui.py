@@ -52,44 +52,42 @@ class LoadRow(QWidget):
 
         # Load number label
         num_lbl = QLabel(f"Load {self.index + 1}")
-        num_lbl.setFont(QFont("Helvetica", 12, QFont.Weight.Bold))
+        num_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         num_lbl.setFixedWidth(64)
         layout.addWidget(num_lbl)
 
         # Duration display
         self._duration_lbl = QLabel(self._load_duration_str())
         self._duration_lbl.setObjectName(f"duration_{self.index}")
-        self._duration_lbl.setFont(QFont("Helvetica", 12))
+        self._duration_lbl.setProperty("cssClass", "chip")
+        self._duration_lbl.setFont(QFont("Consolas", 12))
         self._duration_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._duration_lbl.setFixedWidth(80)
         self._duration_lbl.setFixedHeight(28)
-        self._duration_lbl.setFrameShape(QFrame.Shape.StyledPanel)
-        self._duration_lbl.setFrameShadow(QFrame.Shadow.Sunken)
-        self._duration_lbl.setContentsMargins(4, 0, 4, 0)
         layout.addWidget(self._duration_lbl)
 
         # Start frame label + input
         start_lbl = QLabel(self.content.get("Start Frame", "Start"))
-        start_lbl.setFont(QFont("Helvetica", 11))
+        start_lbl.setFont(QFont("Segoe UI", 11))
         start_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(start_lbl)
 
         self.start_input = QLineEdit(str(self.load.start_frame))
         self.start_input.setObjectName(f"start_{self.index}")
-        self.start_input.setFont(QFont("Helvetica", 12))
+        self.start_input.setFont(QFont("Segoe UI", 12))
         self.start_input.setFixedWidth(100)
         self.start_input.setFixedHeight(28)
         layout.addWidget(self.start_input)
 
         # End frame label + input
         end_lbl = QLabel(self.content.get("End Frame", "End"))
-        end_lbl.setFont(QFont("Helvetica", 11))
+        end_lbl.setFont(QFont("Segoe UI", 11))
         end_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(end_lbl)
 
         self.end_input = QLineEdit(str(self.load.end_frame))
         self.end_input.setObjectName(f"end_{self.index}")
-        self.end_input.setFont(QFont("Helvetica", 12))
+        self.end_input.setFont(QFont("Segoe UI", 12))
         self.end_input.setFixedWidth(100)
         self.end_input.setFixedHeight(28)
         layout.addWidget(self.end_input)
@@ -97,9 +95,10 @@ class LoadRow(QWidget):
         # Delete button
         self._btn_delete = QPushButton(self.content.get("Delete", "Delete"))
         self._btn_delete.setObjectName(f"delete_{self.index}")
-        self._btn_delete.setFont(QFont("Helvetica", 11))
+        self._btn_delete.setProperty("cssClass", "danger-compact")
+        self._btn_delete.setFont(QFont("Segoe UI", 10))
         self._btn_delete.setFixedHeight(28)
-        self._btn_delete.setFixedWidth(70)
+        self._btn_delete.setMinimumWidth(84)
         self._btn_delete.clicked.connect(lambda: self.delete_requested.emit(self.index))
         layout.addWidget(self._btn_delete)
 
@@ -125,7 +124,7 @@ class LoadViewerDialog(QDialog):
         self._time = time
         self.content = content
         self.setWindowTitle(content.get("Loads", "Load Viewer"))
-        self.setMinimumWidth(640)
+        self.setMinimumWidth(720)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self._load_rows: dict[int, LoadRow] = {}
         self._build_ui(time, content)
@@ -137,7 +136,8 @@ class LoadViewerDialog(QDialog):
 
         # Title
         title = QLabel(content.get("Loads", "Loads"))
-        title.setFont(QFont("Helvetica", 18, QFont.Weight.Bold))
+        title.setProperty("cssClass", "heading")
+        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         outer.addWidget(title)
 
         # Scrollable load list
@@ -175,12 +175,13 @@ class LoadViewerDialog(QDialog):
         btn_row.setSpacing(8)
 
         self._btn_save = QPushButton(content.get("Save Edits", "Save Edits"))
-        self._btn_save.setFont(QFont("Helvetica", 12))
+        self._btn_save.setProperty("cssClass", "primary")
+        self._btn_save.setFont(QFont("Segoe UI", 12))
         self._btn_save.setMinimumHeight(34)
         btn_row.addWidget(self._btn_save)
 
         self._btn_discard = QPushButton(content.get("Discard Changes", "Discard Changes"))
-        self._btn_discard.setFont(QFont("Helvetica", 12))
+        self._btn_discard.setFont(QFont("Segoe UI", 12))
         self._btn_discard.setMinimumHeight(34)
         btn_row.addWidget(self._btn_discard)
 

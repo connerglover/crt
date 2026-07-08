@@ -75,9 +75,10 @@ class MainWindow(QMainWindow):
         # ── Time display section (most prominent) ─────────────────────────────
         display_section = QWidget()
         display_section.setObjectName("display_section")
+        display_section.setProperty("cssClass", "card")
         ds_layout = QVBoxLayout(display_section)
-        ds_layout.setContentsMargins(0, 0, 0, 0)
-        ds_layout.setSpacing(6)
+        ds_layout.setContentsMargins(16, 14, 16, 14)
+        ds_layout.setSpacing(10)
 
         self.without_loads_display = self._make_time_display(
             ds_layout,
@@ -86,6 +87,12 @@ class MainWindow(QMainWindow):
             default="00.000",
             tooltip=c.get("Click to Copy Time", "Click to copy"),
         )
+
+        card_sep = QFrame()
+        card_sep.setFrameShape(QFrame.Shape.HLine)
+        card_sep.setFrameShadow(QFrame.Shadow.Sunken)
+        ds_layout.addWidget(card_sep)
+
         self.loads_display = self._make_time_display(
             ds_layout,
             label_text=c["With Loads"],
@@ -131,12 +138,13 @@ class MainWindow(QMainWindow):
         btn_row.setSpacing(8)
         self.btn_copy_mod_note = QPushButton(c["Copy Mod Note"])
         self.btn_copy_mod_note.setObjectName("Copy Mod Note")
+        self.btn_copy_mod_note.setProperty("cssClass", "primary")
         self.btn_add_loads = QPushButton(c["Add Loads"])
         self.btn_add_loads.setObjectName("Add Loads")
         self.btn_edit_loads = QPushButton(c["Edit Loads"])
         self.btn_edit_loads.setObjectName("Edit Loads")
         for btn in (self.btn_copy_mod_note, self.btn_add_loads, self.btn_edit_loads):
-            btn.setFont(QFont("Helvetica", 13))
+            btn.setFont(QFont("Segoe UI", 13))
             btn.setMinimumHeight(38)
             btn_row.addWidget(btn)
         root.addLayout(btn_row)
@@ -149,42 +157,29 @@ class MainWindow(QMainWindow):
 
     def _make_time_display(self, parent_layout: QVBoxLayout, label_text: str,
                            key: str, default: str, tooltip: str) -> ClickableLabel:
-        """Creates a large, prominent read-only time display that looks like a QLineEdit."""
+        """Creates a large, prominent time display row inside the display card."""
         container = QWidget()
         row = QHBoxLayout(container)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(10)
 
         lbl = QLabel(label_text)
-        lbl.setFont(QFont("Helvetica", 13, QFont.Weight.Bold))
+        lbl.setProperty("cssClass", "muted")
+        lbl.setFont(QFont("Segoe UI", 13, QFont.Weight.DemiBold))
         lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        lbl.setMinimumWidth(160)
+        lbl.setMinimumWidth(150)
         row.addWidget(lbl)
 
         display = ClickableLabel(default)
         display.setObjectName(key)
-        # Large, monospace-style font for the time value
-        display.setFont(QFont("Helvetica", 22, QFont.Weight.Bold))
+        display.setProperty("cssClass", "time-value")
+        # Monospaced digits keep the value from jittering as it updates
+        display.setFont(QFont("Consolas", 24, QFont.Weight.Bold))
         display.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         display.setToolTip(tooltip)
-        display.setFixedHeight(46)
+        display.setFixedHeight(42)
         display.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-        # Style it like a read-only QLineEdit: sunken panel with padding
-        display.setFrameShape(QFrame.Shape.StyledPanel)
-        display.setFrameShadow(QFrame.Shadow.Sunken)
-        display.setContentsMargins(10, 0, 10, 0)
-
-        # Extra QSS to make it visually distinct from editable inputs
-        display.setStyleSheet(
-            "ClickableLabel {"
-            "  border-radius: 4px;"
-            "  padding-left: 10px;"
-            "}"
-            "ClickableLabel:hover {"
-            "  border: 1px solid #89b4fa;"
-            "}"
-        )
+        display.setCursor(Qt.CursorShape.PointingHandCursor)
         row.addWidget(display)
 
         parent_layout.addWidget(container)
@@ -195,24 +190,25 @@ class MainWindow(QMainWindow):
         row.setSpacing(6)
 
         lbl = QLabel(label_text)
-        lbl.setFont(QFont("Helvetica", 12))
+        lbl.setFont(QFont("Segoe UI", 12))
         lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl.setMinimumWidth(170)
         row.addWidget(lbl)
 
         inp = QLineEdit(default)
         inp.setObjectName(key)
-        inp.setFont(QFont("Helvetica", 12))
-        inp.setFixedHeight(30)
+        inp.setFont(QFont("Segoe UI", 12))
+        inp.setFixedHeight(32)
         inp.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         row.addWidget(inp)
         self._inputs[key] = inp
 
         paste_btn = QPushButton(paste_label)
         paste_btn.setObjectName(f"{key}_paste")
-        paste_btn.setFont(QFont("Helvetica", 9))
-        paste_btn.setFixedWidth(52)
-        paste_btn.setFixedHeight(30)
+        paste_btn.setProperty("cssClass", "compact")
+        paste_btn.setFont(QFont("Segoe UI", 10))
+        paste_btn.setFixedWidth(58)
+        paste_btn.setFixedHeight(32)
         row.addWidget(paste_btn)
 
         return row
