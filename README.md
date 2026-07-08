@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/github/license/connerglover/crt)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/connerglover/crt)](https://github.com/connerglover/crt/releases/latest)
 
-CRT is a tool that aids speedrunners and moderators in finding the accurate time of a speedrun with or without loads. The GUI is built with [PySide6](https://doc.qt.io/qtforpython-6/) and supports light, dark, and automatic themes.
+CRT is a tool that aids speedrunners and moderators in finding the accurate time of a speedrun with or without loads.
 
 ## Features
 
@@ -22,7 +22,7 @@ CRT is a tool that aids speedrunners and moderators in finding the accurate time
 
 ## Running from Source
 
-CRT targets Python 3.10+ (the codebase uses `match` statements).
+CRT targets Python 3.10+.
 
 ```bash
 pip install -r requirements.txt
@@ -31,7 +31,7 @@ python src/main.py
 
 ## Building the Executable
 
-Windows binaries are built with [PyInstaller](https://pyinstaller.org/) and are produced automatically by the [build workflow](.github/workflows/build.yml) on every push to `main`, and attached to a GitHub Release whenever a `v*` tag is pushed. To build one yourself:
+Windows binaries are built with [PyInstaller](https://pyinstaller.org/) and are produced automatically by the [build workflow](.github/workflows/build.yml) on every push to `main`, and attached to a GitHub Release whenever a version tag (e.g. `1.2.0` or `1.2.0-rc1`) is pushed. To build one yourself:
 
 ```bash
 pip install -r requirements.txt pyinstaller
