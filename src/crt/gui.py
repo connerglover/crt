@@ -1,8 +1,11 @@
+# Standard library
+from decimal import Decimal as d
+
 # Third-party libraries
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFrame, QMenuBar, QMenu,
-    QSizePolicy, QApplication
+    QSizePolicy, QApplication, QSplitter, QScrollArea
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
@@ -20,17 +23,114 @@ class ClickableLabel(QLabel):
         super().mousePressEvent(event)
 
 
+class LoadSidebarRow(QWidget):
+    """A compact, always-visible card for editing a single load inline.
+
+    Layout (stacked, narrow-friendly):
+        Load N   [duration]           [Delete]
+        Start [input]   End [input]
+    """
+
+    edited = Signal(int)
+    delete_requested = Signal(int)
+
+    def __init__(self, index: int, load, framerate: d, precision: int, content: dict, parent=None):
+        super().__init__(parent)
+        self.index = index
+        self.load = load
+        self.framerate = framerate
+        self.precision = precision
+        self.content = content
+        self._build_ui()
+
+    def _duration_str(self) -> str:
+        try:
+            if self.framerate and self.framerate != 0:
+                t = round(d(self.load.length) / d(self.framerate), self.precision)
+            else:
+                t = d(0)
+            return str(t)
+        except Exception:
+            return "0"
+
+    def _build_ui(self):
+        self.setProperty("cssClass", "card")
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(10, 8, 10, 8)
+        outer.setSpacing(6)
+
+        top_row = QHBoxLayout()
+        top_row.setSpacing(6)
+
+        title = QLabel(f"Load {self.index + 1}")
+        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        top_row.addWidget(title)
+
+        self._duration_lbl = QLabel(self._duration_str())
+        self._duration_lbl.setProperty("cssClass", "chip")
+        self._duration_lbl.setFont(QFont("Consolas", 10))
+        self._duration_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._duration_lbl.setFixedHeight(22)
+        top_row.addWidget(self._duration_lbl, 1)
+
+        self._btn_delete = QPushButton("✕")
+        self._btn_delete.setToolTip(self.content.get("Delete", "Delete"))
+        self._btn_delete.setProperty("cssClass", "danger-compact")
+        self._btn_delete.setFont(QFont("Segoe UI", 9))
+        self._btn_delete.setFixedSize(22, 22)
+        self._btn_delete.clicked.connect(lambda: self.delete_requested.emit(self.index))
+        top_row.addWidget(self._btn_delete)
+
+        outer.addLayout(top_row)
+
+        fields_row = QHBoxLayout()
+        fields_row.setSpacing(4)
+
+        start_lbl = QLabel("Start")
+        start_lbl.setFont(QFont("Segoe UI", 9))
+        fields_row.addWidget(start_lbl)
+
+        self.start_input = QLineEdit(str(self.load.start_frame))
+        self.start_input.setFont(QFont("Segoe UI", 10))
+        self.start_input.setFixedHeight(24)
+        self.start_input.setFixedWidth(58)
+        self.start_input.editingFinished.connect(lambda: self.edited.emit(self.index))
+        fields_row.addWidget(self.start_input)
+
+        end_lbl = QLabel("End")
+        end_lbl.setFont(QFont("Segoe UI", 9))
+        fields_row.addWidget(end_lbl)
+
+        self.end_input = QLineEdit(str(self.load.end_frame))
+        self.end_input.setFont(QFont("Segoe UI", 10))
+        self.end_input.setFixedHeight(24)
+        self.end_input.setFixedWidth(58)
+        self.end_input.editingFinished.connect(lambda: self.edited.emit(self.index))
+        fields_row.addWidget(self.end_input)
+
+        fields_row.addStretch()
+
+        outer.addLayout(fields_row)
+
+    def get_values(self) -> tuple[str, str]:
+        return self.start_input.text(), self.end_input.text()
+
+
 class MainWindow(QMainWindow):
     """The main QMainWindow for CRT."""
+
+    load_edited = Signal(int, str, str)
+    load_delete_requested = Signal(int)
 
     def __init__(self, content: dict):
         super().__init__()
         self.content = content
+        self._load_rows: dict[int, LoadSidebarRow] = {}
         self.setWindowTitle("Conner's Retime Tool")
-        self.setFixedWidth(540)
+        self.setMinimumWidth(860)
         self.setMinimumHeight(460)
         self._build_ui()
-        self.adjustSize()
+        self.resize(900, 620)
 
     def _build_ui(self):
         c = self.content
@@ -55,7 +155,6 @@ class MainWindow(QMainWindow):
         self._add_action(edit_menu, c["Copy Mod Note"],   "Copy Mod Note")
         edit_menu.addSeparator()
         self._add_action(edit_menu, c["Clear Loads"],     "Clear Loads")
-        self._add_action(edit_menu, c["Edit Loads"],      "Edit Loads")
 
         help_menu = menubar.addMenu(c["Help"])
         self._add_action(help_menu, c["Check for Updates"], "Check for Updates")
@@ -65,10 +164,32 @@ class MainWindow(QMainWindow):
         help_menu.addSeparator()
         self._add_action(help_menu, c["About"],           "About")
 
-        # ── Central widget ────────────────────────────────────────────────────
+        # ── Central widget: main panel + loads sidebar, side by side ───────────
         central = QWidget()
         self.setCentralWidget(central)
-        root = QVBoxLayout(central)
+        outer = QHBoxLayout(central)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
+        outer.addWidget(splitter)
+
+        main_panel = self._build_main_panel(c)
+        main_panel.setMinimumWidth(480)
+        splitter.addWidget(main_panel)
+
+        loads_panel = self._build_loads_panel(c)
+        loads_panel.setMinimumWidth(240)
+        splitter.addWidget(loads_panel)
+
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([540, 300])
+
+    def _build_main_panel(self, c: dict) -> QWidget:
+        panel = QWidget()
+        root = QVBoxLayout(panel)
         root.setContentsMargins(20, 14, 20, 16)
         root.setSpacing(0)
 
@@ -141,13 +262,80 @@ class MainWindow(QMainWindow):
         self.btn_copy_mod_note.setProperty("cssClass", "primary")
         self.btn_add_loads = QPushButton(c["Add Loads"])
         self.btn_add_loads.setObjectName("Add Loads")
-        self.btn_edit_loads = QPushButton(c["Edit Loads"])
-        self.btn_edit_loads.setObjectName("Edit Loads")
-        for btn in (self.btn_copy_mod_note, self.btn_add_loads, self.btn_edit_loads):
+        for btn in (self.btn_copy_mod_note, self.btn_add_loads):
             btn.setFont(QFont("Segoe UI", 13))
             btn.setMinimumHeight(38)
             btn_row.addWidget(btn)
         root.addLayout(btn_row)
+
+        return panel
+
+    def _build_loads_panel(self, c: dict) -> QWidget:
+        """Builds the scrollable sidebar for viewing/editing loads inline."""
+        panel = QWidget()
+        panel.setObjectName("loads_panel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(12, 14, 16, 16)
+        layout.setSpacing(8)
+
+        header = QLabel(c.get("Loads", "Loads"))
+        header.setProperty("cssClass", "heading")
+        header.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        layout.addWidget(header)
+
+        self._loads_summary = QLabel("")
+        self._loads_summary.setProperty("cssClass", "muted")
+        self._loads_summary.setFont(QFont("Segoe UI", 10))
+        layout.addWidget(self._loads_summary)
+
+        self._loads_scroll = QScrollArea()
+        self._loads_scroll.setWidgetResizable(True)
+        self._loads_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        layout.addWidget(self._loads_scroll, 1)
+
+        self._loads_list_widget = QWidget()
+        self._loads_list_layout = QVBoxLayout(self._loads_list_widget)
+        self._loads_list_layout.setContentsMargins(0, 0, 0, 2)
+        self._loads_list_layout.setSpacing(6)
+        self._loads_list_layout.addStretch()
+        self._loads_scroll.setWidget(self._loads_list_widget)
+
+        self._loads_empty_label = QLabel(
+            c.get("No Loads", "No loads yet. Use Add Loads to create one.")
+        )
+        self._loads_empty_label.setProperty("cssClass", "muted")
+        self._loads_empty_label.setWordWrap(True)
+        self._loads_empty_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self._loads_empty_label)
+
+        return panel
+
+    def refresh_loads(self, loads: list, framerate: d, precision: int, content: dict):
+        """Rebuilds the sidebar's load rows to match the given list of loads."""
+        for row in self._load_rows.values():
+            row.setParent(None)
+            row.deleteLater()
+        self._load_rows.clear()
+
+        for index, load in enumerate(loads):
+            row = LoadSidebarRow(index, load, framerate, precision, content, self._loads_list_widget)
+            row.edited.connect(self._on_load_row_edited)
+            row.delete_requested.connect(self.load_delete_requested.emit)
+            self._loads_list_layout.insertWidget(self._loads_list_layout.count() - 1, row)
+            self._load_rows[index] = row
+
+        has_loads = bool(loads)
+        self._loads_empty_label.setVisible(not has_loads)
+        self._loads_scroll.setVisible(has_loads)
+
+        n = len(loads)
+        self._loads_summary.setText(f"{n} load{'s' if n != 1 else ''}" if n else "")
+
+    def _on_load_row_edited(self, index: int):
+        row = self._load_rows.get(index)
+        if row:
+            start, end = row.get_values()
+            self.load_edited.emit(index, start, end)
 
     def _add_action(self, menu: QMenu, text: str, key: str) -> QAction:
         action = QAction(text, self)

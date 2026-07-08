@@ -20,7 +20,6 @@ from crt.app_settings.app import Settings
 from crt.decorators import error_handler
 from crt.gui import MainGUI
 from crt.load import Load
-from crt.load_viewer.app import LoadViewer
 from crt.save_as.app import SaveAs
 from crt.session_history import SessionHistory
 from crt.time import Time
@@ -699,10 +698,19 @@ class App:
             pass  # Silently ignore network errors during update check
 
     @error_handler
-    def _edit_loads(self) -> NoReturn:
-        """Edits the loads."""
-        load_window = LoadViewer(self.time, self.language)
-        load_window.run()
+    def _on_load_edited(self, index: int, start_text: str, end_text: str) -> NoReturn:
+        """Handles an inline edit to a load row in the sidebar."""
+        if index >= len(self.time.loads):
+            return
+        start_frame = self._parse_frame_input(start_text, self.time)
+        end_frame = self._parse_frame_input(end_text, self.time)
+        self.time.mutate_load(index, start_frame=start_frame, end_frame=end_frame)
+        self._update_displays()
+
+    def _on_load_deleted(self, index: int) -> NoReturn:
+        """Handles a delete request from a load row in the sidebar."""
+        if 0 <= index < len(self.time.loads):
+            self.time.delete_load(index)
         self._update_displays()
 
     @error_handler
@@ -1047,6 +1055,13 @@ class App:
                 ld.setText(self.time.iso_format(False))
             except (DivisionByZero, DivisionUndefined, InvalidOperation):
                 ld.setText("00.000")
+        self._refresh_load_sidebar()
+
+    def _refresh_load_sidebar(self) -> NoReturn:
+        """Refreshes the embedded loads sidebar to match self.time.loads."""
+        self.window.window.refresh_loads(
+            self.time.loads, self.time.framerate, self.time.precision, self.language.content
+        )
 
     def _show_error(self, message):
         """Shows a popup message of the error."""
@@ -1094,7 +1109,10 @@ class App:
         # Action buttons
         win.btn_copy_mod_note.clicked.connect(lambda: self._dispatch("Copy Mod Note", {}))
         win.btn_add_loads.clicked.connect(lambda: self._dispatch("Add Loads", self._get_all_values()))
-        win.btn_edit_loads.clicked.connect(lambda: self._dispatch("Edit Loads", {}))
+
+        # Embedded loads sidebar — live inline editing, no modal dialog
+        win.load_edited.connect(self._on_load_edited)
+        win.load_delete_requested.connect(self._on_load_deleted)
 
         # Clickable display labels
         wl = win.findChild(ClickableLabel, "without_loads_display")
@@ -1145,8 +1163,6 @@ class App:
                     "AmazinCris: Spanish Translations\n\n"
                     "© 2024 Conner Glover"
                 )
-            case "Edit Loads":
-                self._edit_loads()
             case "Add Loads":
                 self._add_loads(values)
             case "Copy Mod Note":
