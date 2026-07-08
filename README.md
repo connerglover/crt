@@ -36,10 +36,10 @@ Windows binaries are built with [PyInstaller](https://pyinstaller.org/) and are 
 ```bash
 pip install -r requirements.txt pyinstaller
 cd src
-pyinstaller --onefile --windowed --icon=icon.ico --name ConnersRetimeTool main.py
+pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt main.py
 ```
 
-The resulting executable is written to `src/dist/ConnersRetimeTool.exe`.
+The resulting executable is written to `src/dist/crt.exe`.
 
 ## Contributing
 

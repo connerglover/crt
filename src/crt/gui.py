@@ -159,9 +159,6 @@ class MainWindow(QMainWindow):
         help_menu = menubar.addMenu(c["Help"])
         self._add_action(help_menu, c["Check for Updates"], "Check for Updates")
         help_menu.addSeparator()
-        self._add_action(help_menu, c["Report Issue"],    "Report Issue")
-        self._add_action(help_menu, c["Suggest Feature"], "Suggest Feature")
-        help_menu.addSeparator()
         self._add_action(help_menu, c["About"],           "About")
 
         # ── Central widget: main panel + loads sidebar, side by side ───────────
@@ -300,13 +297,23 @@ class MainWindow(QMainWindow):
         self._loads_list_layout.addStretch()
         self._loads_scroll.setWidget(self._loads_list_widget)
 
+        # Empty-state placeholder lives in its own container with a leading stretch,
+        # so it sits low in the panel (mirroring where the scroll area's content
+        # would otherwise start) instead of hugging the header once loads exist.
+        self._loads_empty_container = QWidget()
+        empty_layout = QVBoxLayout(self._loads_empty_container)
+        empty_layout.setContentsMargins(0, 0, 0, 0)
+        empty_layout.addStretch(1)
+
         self._loads_empty_label = QLabel(
             c.get("No Loads", "No loads yet. Use Add Loads to create one.")
         )
         self._loads_empty_label.setProperty("cssClass", "muted")
         self._loads_empty_label.setWordWrap(True)
         self._loads_empty_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(self._loads_empty_label)
+        empty_layout.addWidget(self._loads_empty_label)
+
+        layout.addWidget(self._loads_empty_container, 1)
 
         return panel
 
@@ -325,7 +332,7 @@ class MainWindow(QMainWindow):
             self._load_rows[index] = row
 
         has_loads = bool(loads)
-        self._loads_empty_label.setVisible(not has_loads)
+        self._loads_empty_container.setVisible(not has_loads)
         self._loads_scroll.setVisible(has_loads)
 
         n = len(loads)

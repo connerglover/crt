@@ -3,6 +3,7 @@ import json
 import re
 import sys
 from decimal import Decimal as d, InvalidOperation, DivisionByZero, DivisionUndefined
+from pathlib import Path
 from webbrowser import open as open_url
 from typing import NoReturn
 
@@ -11,7 +12,7 @@ from PySide6.QtWidgets import (
     QApplication, QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from requests import get as get_url
 
 # Local application
@@ -47,6 +48,21 @@ def _is_dark_mode() -> bool:
         return value == 0
     except OSError:
         return False
+
+
+def _icon_path() -> str:
+    """Resolves the path to icon.ico for both `python main.py` and the frozen PyInstaller exe.
+
+    PyInstaller's --icon flag only stamps the .exe file's Explorer/taskbar icon;
+    it does not make the file available to the running program. Qt then falls back
+    to its own generic icon for the window/taskbar unless we load and set one
+    ourselves, so the icon has to be bundled as data (see build.yml's --add-data)
+    and located at runtime via sys._MEIPASS when frozen.
+    """
+    base_path = getattr(sys, "_MEIPASS", None)
+    if base_path is None:
+        base_path = Path(__file__).resolve().parent.parent
+    return str(Path(base_path) / "icon.ico")
 
 
 # ── Palette helpers ────────────────────────────────────────────────────────────
@@ -643,6 +659,10 @@ class App:
         # QApplication must exist before any Qt widgets
         self._qt_app = QApplication.instance() or QApplication([])
 
+        icon_path = _icon_path()
+        if Path(icon_path).exists():
+            self._qt_app.setWindowIcon(QIcon(icon_path))
+
         self.time = Time()
         self.file_path = None
         self.past_file_paths = []
@@ -664,6 +684,15 @@ class App:
 
         self.language = self.settings.language
         self.window = MainGUI(self.language.content)
+        if Path(icon_path).exists():
+            self.window.window.setWindowIcon(QIcon(icon_path))
+
+        # The loads sidebar defaults both its empty-state message and its (empty)
+        # scroll area to visible until refresh_loads() runs once to reconcile them —
+        # without this, the first dispatch (e.g. clicking off any input) collapses the
+        # stretchy hidden scroll area out from under the empty-state label, causing a
+        # visible jump. Refresh once up front so the sidebar starts in its final state.
+        self._refresh_load_sidebar()
 
     def _apply_theme(self, theme: str):
         """Applies a Qt stylesheet theme."""
@@ -1150,10 +1179,6 @@ class App:
                 self._update_displays()
             case "Check for Updates":
                 self._check_for_updates()
-            case "Report Issue":
-                open_url("https://forms.gle/mnmbgt6cBeL6Dykk6")
-            case "Suggest Feature":
-                open_url("https://forms.gle/V5bPaQbcFsk6Cijr5")
             case "About":
                 _popup_ok(
                     "About",

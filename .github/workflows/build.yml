@@ -30,18 +30,19 @@ jobs:
 
       - name: Build executable
         working-directory: src
-        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico --name ConnersRetimeTool main.py
+        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt main.py
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ConnersRetimeTool-windows
-          path: src/dist/ConnersRetimeTool.exe
+          name: crt-windows
+          path: src/dist/crt.exe
+          compression-level: 0
 
       - name: Create/update release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: src/dist/ConnersRetimeTool.exe
+          files: src/dist/crt.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
