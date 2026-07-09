@@ -138,32 +138,10 @@ class SettingsGUI(BaseGUI):
 
     def __init__(self, settings: dict, content: dict):
         self.window = SettingsDialog(settings, content)
-        self._last_event = None
-        self._last_values = {}
         self._connect_signals()
 
     def _connect_signals(self):
         d = self.window
-        d.btn_restore.clicked.connect(lambda: self._emit("Restore Defaults"))
-        d.btn_apply.clicked.connect(lambda: self._emit("Apply"))
-        d.btn_cancel.clicked.connect(lambda: self._emit("Cancel"))
-
-    def _emit(self, event: str):
-        self._last_event = event
-        self._last_values = self.window.get_values()
-
-    def read(self) -> tuple:
-        """Blocking read: shows the dialog and returns (event, values)."""
-        from PySide6.QtWidgets import QApplication
-        self._last_event = None
-        self.window.show()
-        # Process events until we get a definitive action
-        while self._last_event is None and self.window.isVisible():
-            QApplication.processEvents()
-        event = self._last_event
-        values = self._last_values
-        return event, values
-
-    def close(self):
-        if self.window:
-            self.window.close()
+        d.btn_restore.clicked.connect(lambda: self._emit("Restore Defaults", self.window.get_values()))
+        d.btn_apply.clicked.connect(lambda: self._emit("Apply", self.window.get_values()))
+        d.btn_cancel.clicked.connect(lambda: self._emit("Cancel", self.window.get_values()))

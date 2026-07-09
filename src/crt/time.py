@@ -43,7 +43,7 @@ class Time:
         Returns:
             int: The total length in frames excluding loads.
         """        
-        return int(self.length_with_loads - sum([load.length for load in self.loads]))
+        return int(self.length_with_loads - sum(load.length for load in self.loads))
     
     @property
     def average_load_length(self) -> int:
@@ -52,7 +52,7 @@ class Time:
         Returns:
             int: The average load length.
         """        
-        return int(sum([load.length for load in self.loads]) / len(self.loads)) if self.loads else 0
+        return int(sum(load.length for load in self.loads) / len(self.loads)) if self.loads else 0
     
     @property
     def with_loads(self) -> d:
@@ -138,13 +138,10 @@ class Time:
 
         Raises:
             ValueError: You must provide an input for the loads.
-            ValueError: The load time exceeds the time.
-        """        
+        """
         if start_frame == 0 and end_frame == 0:
             raise ValueError("You must provide an input for the loads")
-        elif self.length_without_loads - (end_frame - start_frame) < 0:
-            raise ValueError("The load time exceeds the time")
-        
+
         load = Load(start_frame, end_frame)
         self.loads.append(load)
 

@@ -4,22 +4,12 @@ from configparser import ConfigParser
 from typing import NoReturn, Optional
 
 # Third-party
-from PySide6.QtWidgets import QMessageBox
 import appdirs
 
 # Local application
 from crt.language import Language
 from crt.app_settings.gui import SettingsGUI
-
-
-def _popup_yes_no(title: str, message: str) -> bool:
-    """Shows a Yes/No message box. Returns True if Yes."""
-    box = QMessageBox()
-    box.setWindowTitle(title)
-    box.setText(message)
-    box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-    box.setDefaultButton(QMessageBox.StandardButton.No)
-    return box.exec() == QMessageBox.StandardButton.Yes
+from crt.popups import popup_yes_no as _popup_yes_no
 
 
 class Settings:

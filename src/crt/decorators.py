@@ -47,6 +47,32 @@ def validate_load(func: Callable) -> Callable:
         return func(self, *args, **kwargs)
     return wrapper
 
+def format_components(time: d) -> Tuple[str, str, str, str]:
+    """Formats a time value into (hours, minutes, seconds, milliseconds) strings.
+
+    Args:
+        time (d): The time to format.
+
+    Returns:
+        Tuple[str, str, str, str]: A tuple containing the elements of the formatted time.
+    """
+    time_str = str(max(time, d(0)))
+
+    if '.' in time_str:
+        seconds, milliseconds = map(int, time_str.split(".", 1))
+    else:
+        seconds, milliseconds = int(time_str), 0
+
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+
+    return (
+        f"{hours:02}",
+        f"{minutes:02}",
+        f"{seconds:02}",
+        str(milliseconds).rjust(3, "0")
+    )
+
 def format_time(func: Callable) -> Callable:
     """Pre-formats time into hours, minutes, seconds, and milliseconds.
 
@@ -55,33 +81,7 @@ def format_time(func: Callable) -> Callable:
 
     Returns:
         Callable: Function containing the formatted time.
-    """    
-    def format_components(time: d) -> Tuple[str, str, str, str]:
-        """Formats the tiem into hours, minutes, seconds, and milliseconds.
-
-        Args:
-            time (d): The time to format.
-
-        Returns:
-            Tuple[str, str, str, str]: A tuple containing the elements of the formatted time.
-        """        
-        time_str = str(max(time, d(0)))
-        
-        if '.' in time_str:
-            seconds, milliseconds = map(int, time_str.split(".", 1))
-        else:
-            seconds, milliseconds = int(time_str), 0
-        
-        minutes, seconds = divmod(seconds, 60)
-        hours, minutes = divmod(minutes, 60)
-        
-        return (
-            f"{hours:02}",
-            f"{minutes:02}", 
-            f"{seconds:02}",
-            str(milliseconds).rjust(3, "0")
-        )
-
+    """
     @wraps(func)
     def wrapper(self, loads: bool = False) -> str:
         time_value = self.without_loads if loads else self.with_loads

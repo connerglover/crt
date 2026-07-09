@@ -44,33 +44,12 @@ class SessionHistoryGUI(BaseGUI):
 
     def __init__(self, past_file_paths: list, content: dict):
         self.window = SessionHistoryDialog(past_file_paths, content)
-        self._last_event = None
-        self._last_values = {}
         self._connect_signals()
 
     def _connect_signals(self):
         self.window.list_widget.itemDoubleClicked.connect(
-            lambda item: self._emit("session_history", item.text())
+            lambda item: self._emit("session_history", {"session_history": [item.text()]})
         )
         self.window.list_widget.itemActivated.connect(
-            lambda item: self._emit("session_history", item.text())
+            lambda item: self._emit("session_history", {"session_history": [item.text()]})
         )
-
-    def _emit(self, event: str, value=None):
-        self._last_event = event
-        self._last_values = {"session_history": [value] if value else []}
-
-    def read(self) -> tuple:
-        """Blocking read: shows the dialog and returns (event, values)."""
-        from PySide6.QtWidgets import QApplication
-        self._last_event = None
-        self.window.show()
-        while self._last_event is None and self.window.isVisible():
-            QApplication.processEvents()
-        event = self._last_event
-        values = self._last_values
-        return event, values
-
-    def close(self):
-        if self.window:
-            self.window.close()
