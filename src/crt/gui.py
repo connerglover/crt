@@ -127,10 +127,8 @@ class MainWindow(QMainWindow):
         self.content = content
         self._load_rows: dict[int, LoadSidebarRow] = {}
         self.setWindowTitle("Conner's Retime Tool")
-        self.setMinimumWidth(860)
-        self.setMinimumHeight(460)
         self._build_ui()
-        self.resize(900, 620)
+        self.setFixedSize(900, 530)
 
     def _build_ui(self):
         c = self.content
@@ -155,6 +153,10 @@ class MainWindow(QMainWindow):
         self._add_action(edit_menu, c["Copy Mod Note"],   "Copy Mod Note")
         edit_menu.addSeparator()
         self._add_action(edit_menu, c["Clear Loads"],     "Clear Loads")
+
+        view_menu = menubar.addMenu(c["View"])
+        self.action_always_on_top = self._add_action(view_menu, c["Always on Top"], "Always on Top")
+        self.action_always_on_top.setCheckable(True)
 
         help_menu = menubar.addMenu(c["Help"])
         self._add_action(help_menu, c["Check for Updates"], "Check for Updates")
@@ -191,35 +193,26 @@ class MainWindow(QMainWindow):
         root.setSpacing(0)
 
         # ── Time display section (most prominent) ─────────────────────────────
-        display_section = QWidget()
-        display_section.setObjectName("display_section")
-        display_section.setProperty("cssClass", "card")
-        ds_layout = QVBoxLayout(display_section)
-        ds_layout.setContentsMargins(16, 14, 16, 14)
-        ds_layout.setSpacing(10)
+        display_col = QVBoxLayout()
+        display_col.setSpacing(10)
 
-        self.without_loads_display = self._make_time_display(
-            ds_layout,
+        without_loads_card, self.without_loads_display = self._make_time_display(
             label_text=c["Without Loads"],
             key="without_loads_display",
             default="00.000",
             tooltip=c.get("Click to Copy Time", "Click to copy"),
         )
+        display_col.addWidget(without_loads_card)
 
-        card_sep = QFrame()
-        card_sep.setFrameShape(QFrame.Shape.HLine)
-        card_sep.setFrameShadow(QFrame.Shadow.Sunken)
-        ds_layout.addWidget(card_sep)
-
-        self.loads_display = self._make_time_display(
-            ds_layout,
+        loads_card, self.loads_display = self._make_time_display(
             label_text=c["With Loads"],
             key="loads_display",
             default="00.000",
             tooltip=c.get("Click to Copy Time", "Click to copy"),
         )
+        display_col.addWidget(loads_card)
 
-        root.addWidget(display_section)
+        root.addLayout(display_col)
         root.addSpacing(14)
 
         # ── Thin separator ────────────────────────────────────────────────────
@@ -264,6 +257,7 @@ class MainWindow(QMainWindow):
             btn.setMinimumHeight(38)
             btn_row.addWidget(btn)
         root.addLayout(btn_row)
+        root.addStretch(1)
 
         return panel
 
@@ -350,35 +344,36 @@ class MainWindow(QMainWindow):
         menu.addAction(action)
         return action
 
-    def _make_time_display(self, parent_layout: QVBoxLayout, label_text: str,
-                           key: str, default: str, tooltip: str) -> ClickableLabel:
-        """Creates a large, prominent time display row inside the display card."""
-        container = QWidget()
-        row = QHBoxLayout(container)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(10)
+    def _make_time_display(self, label_text: str, key: str, default: str,
+                           tooltip: str) -> tuple[QWidget, ClickableLabel]:
+        """Builds a card-style time display: a small muted caption stacked above
+        a large, centered value. Returns the card and the value label."""
+        card = QWidget()
+        card.setProperty("cssClass", "card")
+        card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
 
-        lbl = QLabel(label_text)
+        lbl = QLabel(label_text.upper())
         lbl.setProperty("cssClass", "muted")
-        lbl.setFont(QFont("Segoe UI", 13, QFont.Weight.DemiBold))
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        lbl.setMinimumWidth(150)
-        row.addWidget(lbl)
+        lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        layout.addWidget(lbl)
 
         display = ClickableLabel(default)
         display.setObjectName(key)
         display.setProperty("cssClass", "time-value")
         # Monospaced digits keep the value from jittering as it updates
-        display.setFont(QFont("Consolas", 24, QFont.Weight.Bold))
-        display.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        display.setFont(QFont("Consolas", 30, QFont.Weight.Bold))
+        display.setAlignment(Qt.AlignmentFlag.AlignCenter)
         display.setToolTip(tooltip)
-        display.setFixedHeight(42)
-        display.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         display.setCursor(Qt.CursorShape.PointingHandCursor)
-        row.addWidget(display)
+        display.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        layout.addWidget(display)
 
-        parent_layout.addWidget(container)
-        return display
+        return card, display
 
     def _make_input_row(self, key: str, label_text: str, default: str, paste_label: str) -> QHBoxLayout:
         row = QHBoxLayout()

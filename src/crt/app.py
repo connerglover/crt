@@ -1012,6 +1012,16 @@ class App:
 
         self._update_displays()
 
+    def _set_always_on_top(self, enabled: bool) -> NoReturn:
+        """Toggles whether the main window stays above all other windows.
+
+        Changing window flags requires the window to be re-shown, since Qt
+        hides it as a side effect of applying the new flags.
+        """
+        win = self.window.window
+        win.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
+        win.show()
+
     def _settings(self) -> NoReturn:
         """Opens the settings."""
         old_settings_dict = self.settings_dict
@@ -1177,6 +1187,8 @@ class App:
             case "Clear Loads":
                 self.time.clear_loads()
                 self._update_displays()
+            case "Always on Top":
+                self._set_always_on_top(self.window.window.action_always_on_top.isChecked())
             case "Check for Updates":
                 self._check_for_updates()
             case "About":

@@ -35,6 +35,8 @@ class Language:
                     "Exit": "Exit",
                     "Edit (Menu Bar)": "Edit",
                     "Clear Loads": "Clear Loads",
+                    "View": "View",
+                    "Always on Top": "Always on Top",
                     "Help": "Help",
                     "Check for Updates": "Check for Updates",
                     "About": "About",
@@ -81,6 +83,8 @@ class Language:
                     "Exit": "Quitter",
                     "Edit (Menu Bar)": "Modifier",
                     "Clear Loads": "Effacer les chargements",
+                    "View": "Affichage",
+                    "Always on Top": "Toujours au premier plan",
                     "Help": "Aide",
                     "Check for Updates": "Vérifier les mises à jours",
                     "About": "À propos",
@@ -127,6 +131,8 @@ class Language:
                     "Exit": "Quitter",
                     "Edit (Menu Bar)": "Wyjście",
                     "Clear Loads": "Wyczyść ładowania",
+                    "View": "Widok",
+                    "Always on Top": "Zawsze na wierzchu",
                     "Help": "Pomoc",
                     "Check for Updates": "Sprawdź aktualizacje",
                     "About": "O programie",
@@ -173,6 +179,8 @@ class Language:
                     "Exit": "Salir",
                     "Edit (Menu Bar)": "Editar",
                     "Clear Loads": "Borrar los Loads",
+                    "View": "Ver",
+                    "Always on Top": "Siempre Visible",
                     "Help": "Ayuda",
                     "Check for Updates": "Buscar Actualizaciones",
                     "About": "Sobre",
@@ -219,6 +227,8 @@ class Language:
                     "Exit": "Exit",
                     "Edit (Menu Bar)": "Edit",
                     "Clear Loads": "Clear Loads",
+                    "View": "View",
+                    "Always on Top": "Always on Top",
                     "Help": "Help",
                     "Check for Updates": "Check for Updates",
                     "About": "About",
@@ -241,7 +251,7 @@ class Language:
                     "Restore Defaults": "Restore Defaults",
                     "Apply": "Apply",
                 }
-    
+
     def translate(self, from_lang: str, to_lang: str, text: str) -> str:
         """
         Translates text from one language to another using language content dictionaries.
