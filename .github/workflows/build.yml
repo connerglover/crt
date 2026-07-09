@@ -30,13 +30,13 @@ jobs:
 
       - name: Build executable
         working-directory: src
-        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt main.py
+        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt-windows main.py
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: crt-windows
-          path: src/dist/crt.exe
+          path: src/dist/crt-windows.exe
           compression-level: 0
 
   build-macos:
@@ -76,15 +76,15 @@ jobs:
         working-directory: src
         run: pyinstaller --noconfirm --onefile --windowed --icon=icon.icns --add-data "icon.ico:." --name crt main.py
 
-      - name: Zip .app bundle
-        working-directory: src/dist
-        run: ditto -c -k --sequesterRsrc --keepParent crt.app ../../crt-macos.app.zip
+      - name: Build .dmg
+        working-directory: src
+        run: hdiutil create -volname CRT -srcfolder dist/crt.app -ov -format UDZO ../crt-macos.dmg
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: crt-macos
-          path: crt-macos.app.zip
+          path: crt-macos.dmg
           compression-level: 0
 
   build-linux:
