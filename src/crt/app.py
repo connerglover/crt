@@ -14,7 +14,7 @@ from PySide6.QtGui import QAction, QGuiApplication, QIcon
 # Local application
 from crt._version import __version__
 from crt.app_settings.app import Settings
-from crt.decorators import error_handler, format_components
+from crt.decorators import error_handler, format_components, format_frame_time
 from crt.file_manager import FileManager
 from crt.frame_input import clean_framerate, parse_frame_input
 from crt.gui import ClickableLabel, MainGUI
@@ -372,6 +372,64 @@ class App:
             plug="[Conner's Retime Tool](https://github.com/connerglover/conners-retime-tool)",
         )
 
+    # ── Copy actions ──────────────────────────────────────────────────────────
+
+    def _frame_time(self, frame: int) -> str:
+        """Formats an absolute frame position as an ISO-style timestamp."""
+        time = self.files.time
+        return format_frame_time(frame, time.framerate, time.precision)
+
+    def _load_duration(self, load) -> str:
+        """Formats a load's duration as an ISO-style timestamp."""
+        time = self.files.time
+        return format_frame_time(load.length, time.framerate, time.precision)
+
+    def _youtube_timestamp(self, frame: int) -> str:
+        """Formats an absolute frame position as a YouTube chapter timestamp
+        (M:SS or H:MM:SS) — YouTube chapters don't support milliseconds."""
+        fps = self.files.time.framerate
+        total_seconds = int(frame / fps) if fps else 0
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours}:{minutes:02}:{seconds:02}"
+        return f"{minutes}:{seconds:02}"
+
+    @property
+    def _discord_message(self) -> str:
+        """Builds a Discord-friendly code block summarizing the run and its loads."""
+        time = self.files.time
+        lines = [
+            f"Time: {time.iso_format(True)}",
+            f"Time (with loads): {time.iso_format(False)}",
+        ]
+        if time.loads:
+            lines.append("")
+            lines.append(f"Loads ({len(time.loads)}):")
+            for index, load in enumerate(time.loads, start=1):
+                lines.append(
+                    f"{index}. {self._frame_time(load.start_frame)} - "
+                    f"{self._frame_time(load.end_frame)} ({self._load_duration(load)})"
+                )
+        return "```\n" + "\n".join(lines) + "\n```"
+
+    @property
+    def _youtube_chapters(self) -> str:
+        """Builds a YouTube chapters list alternating Gameplay/Loading segments.
+
+        Load frame positions are assumed to be absolute positions in the source
+        video (matching the YouTube-debug-string paste feature), so they can be
+        used directly as chapter timestamps. YouTube requires the first chapter
+        to start at 0:00, so gameplay always opens the list.
+        """
+        loads = sorted(self.files.time.loads, key=lambda load: load.start_frame)
+
+        lines = ["0:00 Gameplay"]
+        for load in loads:
+            lines.append(f"{self._youtube_timestamp(load.start_frame)} Loading")
+            lines.append(f"{self._youtube_timestamp(load.end_frame)} Gameplay")
+        return "\n".join(lines)
+
     # ── Display updates ────────────────────────────────────────────────────────
 
     def _update_displays(self) -> NoReturn:
@@ -501,6 +559,16 @@ class App:
             case "Copy Mod Note":
                 try:
                     _clipboard_set(self._mod_note)
+                except Exception as e:
+                    self._show_error(e)
+            case "Copy Discord Message":
+                try:
+                    _clipboard_set(self._discord_message)
+                except Exception as e:
+                    self._show_error(e)
+            case "Copy YouTube Chapters":
+                try:
+                    _clipboard_set(self._youtube_chapters)
                 except Exception as e:
                     self._show_error(e)
             case "framerate_paste":

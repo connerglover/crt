@@ -121,6 +121,39 @@ QPushButton[cssClass="primary"]:hover {
 QPushButton[cssClass="primary"]:pressed {
     background-color: #4a86bd;
 }
+QToolButton {
+    background-color: #2e2e2e;
+    color: #d4d4d4;
+    border: 1px solid #454545;
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-weight: 500;
+}
+QToolButton:hover {
+    background-color: #454545;
+    border-color: #5a5a5a;
+}
+QToolButton:pressed {
+    background-color: #262626;
+}
+QToolButton[cssClass="primary"] {
+    background-color: #5b9bd5;
+    color: #1e1e1e;
+    border: 1px solid #5b9bd5;
+    font-weight: 600;
+}
+QToolButton[cssClass="primary"]:hover {
+    background-color: #77aee0;
+    border-color: #77aee0;
+}
+QToolButton[cssClass="primary"]:pressed {
+    background-color: #4a86bd;
+}
+QToolButton::menu-button {
+    border: none;
+    border-left: 1px solid rgba(0, 0, 0, 0.2);
+    width: 24px;
+}
 QPushButton[cssClass="danger"] {
     background-color: transparent;
     color: #e06c75;
@@ -420,6 +453,39 @@ QPushButton[cssClass="primary"]:hover {
 }
 QPushButton[cssClass="primary"]:pressed {
     background-color: #1857d1;
+}
+QToolButton {
+    background-color: #ffffff;
+    color: #4c4f69;
+    border: 1px solid #bcc0cc;
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-weight: 500;
+}
+QToolButton:hover {
+    background-color: #e6e9ef;
+    border-color: #acb0be;
+}
+QToolButton:pressed {
+    background-color: #ccd0da;
+}
+QToolButton[cssClass="primary"] {
+    background-color: #1e66f5;
+    color: #eff1f5;
+    border: 1px solid #1e66f5;
+    font-weight: 600;
+}
+QToolButton[cssClass="primary"]:hover {
+    background-color: #4783f6;
+    border-color: #4783f6;
+}
+QToolButton[cssClass="primary"]:pressed {
+    background-color: #1857d1;
+}
+QToolButton::menu-button {
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+    width: 24px;
 }
 QPushButton[cssClass="danger"] {
     background-color: transparent;

@@ -4,7 +4,7 @@ from decimal import Decimal as d
 # Third-party libraries
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QFrame, QMenuBar, QMenu,
+    QLabel, QLineEdit, QPushButton, QToolButton, QFrame, QMenuBar, QMenu,
     QSizePolicy, QApplication, QSplitter, QScrollArea
 )
 from PySide6.QtCore import Qt, Signal
@@ -12,7 +12,7 @@ from PySide6.QtGui import QAction, QFont
 
 # Local application
 from crt.base_gui import BaseGUI
-from crt.decorators import format_iso
+from crt.decorators import format_frame_time
 
 
 class ClickableLabel(QLabel):
@@ -46,11 +46,7 @@ class LoadSidebarRow(QWidget):
 
     def _duration_str(self) -> str:
         try:
-            if self.framerate and self.framerate != 0:
-                t = round(d(self.load.length) / d(self.framerate), self.precision)
-            else:
-                t = d(0)
-            return format_iso(t)
+            return format_frame_time(self.load.length, self.framerate, self.precision)
         except Exception:
             return "0"
 
@@ -276,15 +272,32 @@ class MainWindow(QMainWindow):
         # ── Action buttons ────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        self.btn_copy_mod_note = QPushButton(c["Copy Mod Note"])
+
+        # Split button: clicking the body copies the mod note as before; the
+        # dropdown arrow reveals alternate copy formats (Discord, YouTube).
+        self.btn_copy_mod_note = QToolButton()
+        self.btn_copy_mod_note.setText(c["Copy Mod Note"])
         self.btn_copy_mod_note.setObjectName("Copy Mod Note")
         self.btn_copy_mod_note.setProperty("cssClass", "primary")
+        self.btn_copy_mod_note.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        self.btn_copy_mod_note.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+
+        copy_menu = QMenu(self.btn_copy_mod_note)
+        self._add_action(
+            copy_menu, c.get("Copy Discord Message", "Copy Discord Message"), "Copy Discord Message"
+        )
+        self._add_action(
+            copy_menu, c.get("Copy YouTube Chapters", "Copy YouTube Chapters"), "Copy YouTube Chapters"
+        )
+        self.btn_copy_mod_note.setMenu(copy_menu)
+
         self.btn_add_loads = QPushButton(c["Add Loads"])
         self.btn_add_loads.setObjectName("Add Loads")
         for btn in (self.btn_copy_mod_note, self.btn_add_loads):
             btn.setFont(QFont("Segoe UI", 13))
             btn.setMinimumHeight(38)
-            btn_row.addWidget(btn)
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn_row.addWidget(btn, 1)
         root.addLayout(btn_row)
         root.addStretch(1)
 

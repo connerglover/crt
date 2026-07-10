@@ -91,6 +91,21 @@ def format_iso(time: d) -> str:
         return f"{minutes}:{seconds}.{ms}"
     return f"{seconds}.{ms}"
 
+def format_frame_time(frames: int, framerate: d, precision: int) -> str:
+    """Converts a frame count/position at the given framerate into an ISO-style timestamp.
+
+    Args:
+        frames (int): A frame count (duration) or absolute frame position.
+        framerate (d): The framerate to convert with.
+        precision (int): Decimal places to round the resulting seconds to.
+
+    Returns:
+        str: The formatted time, e.g. "01:15.000". "0.000" if framerate is falsy.
+    """
+    if not framerate:
+        return format_iso(d(0))
+    return format_iso(round(d(frames) / d(framerate), precision))
+
 def format_time(func: Callable) -> Callable:
     """Pre-formats time into hours, minutes, seconds, and milliseconds.
 
