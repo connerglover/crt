@@ -80,7 +80,15 @@ class App:
         if Path(icon_path).exists():
             self.window.window.setWindowIcon(QIcon(icon_path))
 
-        self._always_on_top = False
+        # Enabled by default. Set the flag directly rather than via
+        # _set_always_on_top(), which calls win.show() to reapply the flag on an
+        # already-visible window — calling that here, before run() wires up the
+        # window and shows it, would flash a blank window while startup work
+        # (e.g. the update check below) is still blocking.
+        self._always_on_top = True
+        self.window.window.action_always_on_top.setChecked(True)
+        self.window.window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+
         self.window.window.update_link_clicked.connect(open_releases_page)
 
         if self.settings_dict["enable_updates"]:

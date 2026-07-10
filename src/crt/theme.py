@@ -308,6 +308,19 @@ QPushButton[cssClass="update-banner-close"]:hover {
     background-color: rgba(0, 0, 0, 0.15);
     border-radius: 4px;
 }
+QPushButton[cssClass="panel-toggle"] {
+    background-color: #181818;
+    border: none;
+    border-left: 1px solid #2e2e2e;
+    border-radius: 0px;
+    color: #9a9a9a;
+    padding: 0px;
+    font-weight: 400;
+}
+QPushButton[cssClass="panel-toggle"]:hover {
+    background-color: #242424;
+    color: #d4d4d4;
+}
 """
 
 LIGHT_PALETTE = """
@@ -589,6 +602,19 @@ QPushButton[cssClass="update-banner-close"] {
 QPushButton[cssClass="update-banner-close"]:hover {
     background-color: rgba(0, 0, 0, 0.08);
     border-radius: 4px;
+}
+QPushButton[cssClass="panel-toggle"] {
+    background-color: #e6e9ef;
+    border: none;
+    border-left: 1px solid #ccd0da;
+    border-radius: 0px;
+    color: #6c6f85;
+    padding: 0px;
+    font-weight: 400;
+}
+QPushButton[cssClass="panel-toggle"]:hover {
+    background-color: #dce0e8;
+    color: #4c4f69;
 }
 """
 
