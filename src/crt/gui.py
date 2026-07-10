@@ -121,6 +121,11 @@ class MainWindow(QMainWindow):
 
     load_edited = Signal(int, str, str)
     load_delete_requested = Signal(int)
+    update_link_clicked = Signal()
+
+    _BASE_WIDTH = 900
+    _BASE_HEIGHT = 530
+    _UPDATE_BANNER_HEIGHT = 34
 
     def __init__(self, content: dict):
         super().__init__()
@@ -128,7 +133,7 @@ class MainWindow(QMainWindow):
         self._load_rows: dict[int, LoadSidebarRow] = {}
         self.setWindowTitle("Conner's Retime Tool")
         self._build_ui()
-        self.setFixedSize(900, 530)
+        self.setFixedSize(self._BASE_WIDTH, self._BASE_HEIGHT)
 
     def _build_ui(self):
         c = self.content
@@ -159,16 +164,23 @@ class MainWindow(QMainWindow):
         self.action_always_on_top.setCheckable(True)
 
         help_menu = menubar.addMenu(c["Help"])
-        self._add_action(help_menu, c["Check for Updates"], "Check for Updates")
-        help_menu.addSeparator()
-        self._add_action(help_menu, c["About"],           "About")
+        self._add_action(help_menu, c["About"], "About")
 
-        # ── Central widget: main panel + loads sidebar, side by side ───────────
+        # ── Central widget: update banner above main panel + loads sidebar ─────
         central = QWidget()
         self.setCentralWidget(central)
-        outer = QHBoxLayout(central)
+        central_layout = QVBoxLayout(central)
+        central_layout.setContentsMargins(0, 0, 0, 0)
+        central_layout.setSpacing(0)
+
+        self.update_banner = self._build_update_banner()
+        central_layout.addWidget(self.update_banner)
+
+        body = QWidget()
+        outer = QHBoxLayout(body)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+        central_layout.addWidget(body, 1)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
@@ -337,6 +349,54 @@ class MainWindow(QMainWindow):
         if row:
             start, end = row.get_values()
             self.load_edited.emit(index, start, end)
+
+    def _build_update_banner(self) -> QWidget:
+        """Builds the dismissible yellow update-available bar shown above the main panel."""
+        banner = QWidget()
+        banner.setProperty("cssClass", "update-banner")
+        banner.setFixedHeight(self._UPDATE_BANNER_HEIGHT)
+        banner.setVisible(False)
+
+        layout = QHBoxLayout(banner)
+        layout.setContentsMargins(14, 0, 6, 0)
+        layout.setSpacing(8)
+
+        self.update_banner_label = ClickableLabel("")
+        self.update_banner_label.setObjectName("update_banner_label")
+        self.update_banner_label.setProperty("cssClass", "update-banner-text")
+        self.update_banner_label.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))
+        self.update_banner_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_banner_label.clicked.connect(self.update_link_clicked.emit)
+        layout.addWidget(self.update_banner_label, 1)
+
+        close_btn = QPushButton("✕")
+        close_btn.setObjectName("update_banner_close")
+        close_btn.setProperty("cssClass", "update-banner-close")
+        close_btn.setFixedSize(22, 22)
+        close_btn.setFont(QFont("Segoe UI", 9))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setToolTip(self.content.get("Dismiss", "Dismiss"))
+        close_btn.clicked.connect(self.hide_update_banner)
+        layout.addWidget(close_btn)
+
+        return banner
+
+    def show_update_banner(self, version: str) -> None:
+        """Shows the update banner for the given version, growing the window to fit it."""
+        text = self.content.get(
+            "Update Available Banner", "A new version ({version}) is available — click to download."
+        ).format(version=version)
+        self.update_banner_label.setText(text)
+
+        if not self.update_banner.isVisible():
+            self.update_banner.setVisible(True)
+            self.setFixedSize(self._BASE_WIDTH, self._BASE_HEIGHT + self._UPDATE_BANNER_HEIGHT)
+
+    def hide_update_banner(self) -> None:
+        """Hides the update banner, shrinking the window back to its base size."""
+        if self.update_banner.isVisible():
+            self.update_banner.setVisible(False)
+            self.setFixedSize(self._BASE_WIDTH, self._BASE_HEIGHT)
 
     def _add_action(self, menu: QMenu, text: str, key: str) -> QAction:
         action = QAction(text, self)

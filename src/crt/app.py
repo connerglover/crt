@@ -21,7 +21,7 @@ from crt.gui import ClickableLabel, MainGUI
 from crt.popups import popup_yes_no as _popup_yes_no, popup_ok as _popup_ok, popup_error as _popup_error
 from crt.session_history import SessionHistory
 from crt.theme import stylesheet_for
-from crt.updater import check_for_updates
+from crt.updater import check_for_updates, open_releases_page
 
 
 def _icon_path() -> str:
@@ -75,15 +75,16 @@ class App:
         # Apply theme via stylesheet
         self._apply_theme(self.settings_dict["theme"])
 
-        if self.settings_dict["enable_updates"]:
-            check_for_updates()
-
         self.language = self.settings.language
         self.window = MainGUI(self.language.content)
         if Path(icon_path).exists():
             self.window.window.setWindowIcon(QIcon(icon_path))
 
         self._always_on_top = False
+        self.window.window.update_link_clicked.connect(open_releases_page)
+
+        if self.settings_dict["enable_updates"]:
+            self._check_for_updates()
 
         # The loads sidebar defaults both its empty-state message and its (empty)
         # scroll area to visible until refresh_loads() runs once to reconcile them —
@@ -309,6 +310,14 @@ class App:
         win.show()
         self._always_on_top = enabled
 
+    def _check_for_updates(self) -> NoReturn:
+        """Checks for a newer release and shows the update banner if one exists."""
+        latest_version = check_for_updates()
+        if latest_version:
+            self.window.window.show_update_banner(latest_version)
+        else:
+            self.window.window.hide_update_banner()
+
     def _settings(self) -> NoReturn:
         """Opens the settings."""
         old_settings_dict = self.settings_dict
@@ -468,8 +477,6 @@ class App:
                 self._update_displays()
             case "Always on Top":
                 self._set_always_on_top(self.window.window.action_always_on_top.isChecked())
-            case "Check for Updates":
-                check_for_updates(self.window.window, self._always_on_top)
             case "About":
                 _popup_ok(
                     "About",
@@ -477,7 +484,7 @@ class App:
                     "Created by Conner Glover\n\n"
                     "Credits:\nMenzo: French and Polish Translations\n"
                     "AmazinCris: Spanish Translations\n\n"
-                    "© 2024 Conner Glover",
+                    "© 2026 Conner Glover",
                     self.window.window, self._always_on_top
                 )
             case "Add Loads":

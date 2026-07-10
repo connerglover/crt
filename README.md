@@ -12,6 +12,7 @@ CRT is a tool that aids speedrunners and moderators in finding the accurate time
 - Generate a customizable mod note (see [Mod Note Format.MD](Mod%20Note%20Format.MD) for the available placeholders)
 - Save/load sessions to a file and revisit recent sessions from Session History
 - Available in English, Français, Polski, and Español
+- Always on Top mode keeps CRT above other windows
 - Automatic update checks against the latest GitHub release
 
 ## Installation
@@ -31,7 +32,9 @@ python src/main.py
 
 ## Building the Executable
 
-Windows binaries are built with [PyInstaller](https://pyinstaller.org/) and are produced automatically by the [build workflow](.github/workflows/build.yml) on every push to `main`, and attached to a GitHub Release whenever a version tag (e.g. `1.2.0` or `1.2.0-rc1`) is pushed. To build one yourself:
+Windows, macOS, and Linux binaries are built with [PyInstaller](https://pyinstaller.org/) and are produced automatically by the [build workflow](.github/workflows/build.yml) on every push to `main`, and attached to a GitHub Release whenever a version tag (e.g. `1.2.0` or `1.2.0-rc1`) is pushed. To build one yourself:
+
+### Windows
 
 ```bash
 pip install -r requirements.txt pyinstaller
@@ -40,6 +43,38 @@ pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name 
 ```
 
 The resulting executable is written to `src/dist/crt.exe`.
+
+### macOS
+
+```bash
+pip install -r requirements.txt pyinstaller pillow
+cd src
+python - <<'PY'
+import os
+from PIL import Image
+
+im = Image.open("icon.ico").convert("RGBA")
+os.makedirs("crt.iconset", exist_ok=True)
+for size in (16, 32, 128, 256, 512):
+    im.resize((size, size), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}.png")
+    im.resize((size * 2, size * 2), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}@2x.png")
+PY
+iconutil -c icns crt.iconset -o icon.icns
+pyinstaller --onefile --windowed --icon=icon.icns --add-data "icon.ico:." --name crt main.py
+hdiutil create -volname CRT -srcfolder dist/crt.app -ov -format UDZO ../crt-macos.dmg
+```
+
+The resulting app bundle is written to `src/dist/crt.app`, packaged as a disk image at `crt-macos.dmg`.
+
+### Linux
+
+```bash
+pip install -r requirements.txt pyinstaller
+cd src
+pyinstaller --onefile --name crt main.py
+```
+
+The resulting executable is written to `src/dist/crt`. The [build workflow](.github/workflows/build.yml) additionally packages this into an AppImage for distribution.
 
 ## Contributing
 
@@ -59,13 +94,3 @@ Bug reports, feature requests, and pull requests are welcome — see [CONTRIBUTI
 ## License
 
 CRT is licensed under the [MIT License](LICENSE).
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=connerglover%2Fcrt&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=connerglover/crt&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=connerglover/crt&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=connerglover/crt&type=date&legend=top-left" />
- </picture>
-</a>

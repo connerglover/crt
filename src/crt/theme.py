@@ -285,6 +285,29 @@ QLabel[cssClass="time-value"] {
 QLabel[cssClass="time-value"]:hover {
     color: #5b9bd5;
 }
+QWidget[cssClass="update-banner"] {
+    background-color: #5b9bd5;
+    border-bottom: 1px solid #4a86bd;
+}
+QLabel[cssClass="update-banner-text"] {
+    color: #1e1e1e;
+    background-color: transparent;
+}
+QLabel[cssClass="update-banner-text"]:hover {
+    color: #000000;
+    background-color: transparent;
+}
+QPushButton[cssClass="update-banner-close"] {
+    background-color: transparent;
+    border: none;
+    color: #1e1e1e;
+    padding: 0px;
+    font-weight: 600;
+}
+QPushButton[cssClass="update-banner-close"]:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
 """
 
 LIGHT_PALETTE = """
@@ -543,6 +566,29 @@ QLabel[cssClass="time-value"] {
 }
 QLabel[cssClass="time-value"]:hover {
     color: #1e66f5;
+}
+QWidget[cssClass="update-banner"] {
+    background-color: #1e66f5;
+    border-bottom: 1px solid #1857d1;
+}
+QLabel[cssClass="update-banner-text"] {
+    color: #eff1f5;
+    background-color: transparent;
+}
+QLabel[cssClass="update-banner-text"]:hover {
+    color: #ffffff;
+    background-color: transparent;
+}
+QPushButton[cssClass="update-banner-close"] {
+    background-color: transparent;
+    border: none;
+    color: #eff1f5;
+    padding: 0px;
+    font-weight: 600;
+}
+QPushButton[cssClass="update-banner-close"]:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
 }
 """
 

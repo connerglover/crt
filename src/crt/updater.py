@@ -1,5 +1,5 @@
 # Standard library
-from typing import NoReturn
+from typing import Optional
 from webbrowser import open as open_url
 
 # Third-party
@@ -7,14 +7,19 @@ from requests import get as get_url
 
 # Local application
 from crt._version import __version__
-from crt.popups import popup_yes_no
+
+RELEASES_URL = "https://github.com/connerglover/Conners-Retime-Tool/releases/latest"
 
 
-def check_for_updates(parent=None, on_top: bool = False) -> NoReturn:
-    """Checks GitHub for a newer release and offers to open the download page.
+def check_for_updates() -> Optional[str]:
+    """Checks GitHub for a newer release.
 
     Silently ignores network errors — this runs on every startup and a flaky
     connection shouldn't interrupt using the app.
+
+    Returns:
+        Optional[str]: The latest version tag if newer than the running version,
+            otherwise None.
     """
     try:
         response = get_url(
@@ -25,11 +30,12 @@ def check_for_updates(parent=None, on_top: bool = False) -> NoReturn:
             latest_release = response.json()
             latest_version = latest_release["tag_name"]
             if str(latest_version) != str(__version__):
-                if popup_yes_no(
-                    "Update Available",
-                    f"A new version of CRT is available: {latest_version}.\nWould you like to update?",
-                    parent, on_top
-                ):
-                    open_url("https://github.com/connerglover/Conners-Retime-Tool/releases/latest")
+                return str(latest_version)
     except Exception:
         pass
+    return None
+
+
+def open_releases_page() -> None:
+    """Opens the latest release page in the default browser."""
+    open_url(RELEASES_URL)
