@@ -1,4 +1,4 @@
-# Standard library
+﻿# Standard library
 import sys
 
 
@@ -7,7 +7,7 @@ def is_dark_mode() -> bool:
 
     Reads the Windows registry directly instead of depending on the
     third-party `darkdetect` package, which pulls in a platform-specific
-    submodule (`_windows_detect`) that's easy to lose track of — either
+    submodule (`_windows_detect`) that's easy to lose track of â€” either
     it's missing because dependencies weren't installed, or PyInstaller's
     static import analysis fails to bundle it into the frozen exe.
     Falls back to light mode on any failure or on non-Windows platforms.
@@ -26,8 +26,52 @@ def is_dark_mode() -> bool:
         return False
 
 
-# A neutral grey dark theme (no blue/purple tint in the base surfaces) with a
-# plain steel-blue accent reserved for interactive/selected elements.
+DEFAULT_ACCENT_COLOR = "#5b9bd5"
+
+
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    """Converts a "#rrggbb" hex string into an (r, g, b) tuple."""
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    """Converts an (r, g, b) tuple into a "#rrggbb" hex string."""
+    return "#{:02x}{:02x}{:02x}".format(*(max(0, min(255, c)) for c in rgb))
+
+
+def _lighten(hex_color: str, amount: float = 0.2) -> str:
+    """Blends a hex color toward white by `amount` (0-1), for hover states."""
+    r, g, b = _hex_to_rgb(hex_color)
+    return _rgb_to_hex((
+        round(r + (255 - r) * amount),
+        round(g + (255 - g) * amount),
+        round(b + (255 - b) * amount),
+    ))
+
+
+def _darken(hex_color: str, amount: float = 0.22) -> str:
+    """Blends a hex color toward black by `amount` (0-1), for pressed states."""
+    r, g, b = _hex_to_rgb(hex_color)
+    return _rgb_to_hex((round(r * (1 - amount)), round(g * (1 - amount)), round(b * (1 - amount))))
+
+
+def _with_accent(palette: str, accent: str) -> str:
+    """Substitutes the accent placeholder tokens in a palette with a user color.
+
+    Uses plain token replacement rather than `str.format` because QSS itself
+    uses `{`/`}` for rule blocks, which would collide with format fields.
+    """
+    return (
+        palette
+        .replace("__ACCENT_HOVER__", _lighten(accent))
+        .replace("__ACCENT_PRESSED__", _darken(accent))
+        .replace("__ACCENT__", accent)
+    )
+
+
+# A neutral grey dark theme (no blue/purple tint in the base surfaces) with an
+# accent color (user-configurable, see Settings) reserved for interactive/selected elements.
 DARK_PALETTE = """
 QWidget {
     background-color: #1e1e1e;
@@ -75,14 +119,14 @@ QLineEdit {
     border: 1px solid #454545;
     border-radius: 7px;
     padding: 3px 10px;
-    selection-background-color: #5b9bd5;
+    selection-background-color: __ACCENT__;
     selection-color: #1e1e1e;
 }
 QLineEdit:hover {
     border: 1px solid #5a5a5a;
 }
 QLineEdit:focus {
-    border: 1px solid #5b9bd5;
+    border: 1px solid __ACCENT__;
 }
 QLineEdit:disabled {
     color: #6e6e6e;
@@ -109,17 +153,17 @@ QPushButton:disabled {
     border-color: #2e2e2e;
 }
 QPushButton[cssClass="primary"] {
-    background-color: #5b9bd5;
+    background-color: __ACCENT__;
     color: #1e1e1e;
-    border: 1px solid #5b9bd5;
+    border: 1px solid __ACCENT__;
     font-weight: 600;
 }
 QPushButton[cssClass="primary"]:hover {
-    background-color: #77aee0;
-    border-color: #77aee0;
+    background-color: __ACCENT_HOVER__;
+    border-color: __ACCENT_HOVER__;
 }
 QPushButton[cssClass="primary"]:pressed {
-    background-color: #4a86bd;
+    background-color: __ACCENT_PRESSED__;
 }
 QToolButton {
     background-color: #2e2e2e;
@@ -137,17 +181,17 @@ QToolButton:pressed {
     background-color: #262626;
 }
 QToolButton[cssClass="primary"] {
-    background-color: #5b9bd5;
+    background-color: __ACCENT__;
     color: #1e1e1e;
-    border: 1px solid #5b9bd5;
+    border: 1px solid __ACCENT__;
     font-weight: 600;
 }
 QToolButton[cssClass="primary"]:hover {
-    background-color: #77aee0;
-    border-color: #77aee0;
+    background-color: __ACCENT_HOVER__;
+    border-color: __ACCENT_HOVER__;
 }
 QToolButton[cssClass="primary"]:pressed {
-    background-color: #4a86bd;
+    background-color: __ACCENT_PRESSED__;
 }
 QToolButton::menu-button {
     border: none;
@@ -193,7 +237,7 @@ QLabel {
     color: #d4d4d4;
 }
 QLabel[cssClass="heading"] {
-    color: #5b9bd5;
+    color: __ACCENT__;
 }
 QLabel[cssClass="muted"] {
     color: #9a9a9a;
@@ -243,11 +287,11 @@ QCheckBox::indicator {
     background-color: #2e2e2e;
 }
 QCheckBox::indicator:hover {
-    border-color: #5b9bd5;
+    border-color: __ACCENT__;
 }
 QCheckBox::indicator:checked {
-    background-color: #5b9bd5;
-    border-color: #5b9bd5;
+    background-color: __ACCENT__;
+    border-color: __ACCENT__;
 }
 QListWidget {
     background-color: #181818;
@@ -264,7 +308,7 @@ QListWidget::item:hover {
     background-color: #242424;
 }
 QListWidget::item:selected {
-    background-color: #5b9bd5;
+    background-color: __ACCENT__;
     color: #1e1e1e;
 }
 QScrollBar:vertical {
@@ -321,11 +365,11 @@ QLabel[cssClass="time-value"] {
     color: #d4d4d4;
 }
 QLabel[cssClass="time-value"]:hover {
-    color: #5b9bd5;
+    color: __ACCENT__;
 }
 QWidget[cssClass="update-banner"] {
-    background-color: #5b9bd5;
-    border-bottom: 1px solid #4a86bd;
+    background-color: __ACCENT__;
+    border-bottom: 1px solid __ACCENT_PRESSED__;
 }
 QLabel[cssClass="update-banner-text"] {
     color: #1e1e1e;
@@ -408,14 +452,14 @@ QLineEdit {
     border: 1px solid #bcc0cc;
     border-radius: 7px;
     padding: 3px 10px;
-    selection-background-color: #1e66f5;
+    selection-background-color: __ACCENT__;
     selection-color: #eff1f5;
 }
 QLineEdit:hover {
     border: 1px solid #acb0be;
 }
 QLineEdit:focus {
-    border: 1px solid #1e66f5;
+    border: 1px solid __ACCENT__;
 }
 QLineEdit:disabled {
     color: #9ca0b0;
@@ -442,17 +486,17 @@ QPushButton:disabled {
     border-color: #ccd0da;
 }
 QPushButton[cssClass="primary"] {
-    background-color: #1e66f5;
+    background-color: __ACCENT__;
     color: #eff1f5;
-    border: 1px solid #1e66f5;
+    border: 1px solid __ACCENT__;
     font-weight: 600;
 }
 QPushButton[cssClass="primary"]:hover {
-    background-color: #4783f6;
-    border-color: #4783f6;
+    background-color: __ACCENT_HOVER__;
+    border-color: __ACCENT_HOVER__;
 }
 QPushButton[cssClass="primary"]:pressed {
-    background-color: #1857d1;
+    background-color: __ACCENT_PRESSED__;
 }
 QToolButton {
     background-color: #ffffff;
@@ -470,17 +514,17 @@ QToolButton:pressed {
     background-color: #ccd0da;
 }
 QToolButton[cssClass="primary"] {
-    background-color: #1e66f5;
+    background-color: __ACCENT__;
     color: #eff1f5;
-    border: 1px solid #1e66f5;
+    border: 1px solid __ACCENT__;
     font-weight: 600;
 }
 QToolButton[cssClass="primary"]:hover {
-    background-color: #4783f6;
-    border-color: #4783f6;
+    background-color: __ACCENT_HOVER__;
+    border-color: __ACCENT_HOVER__;
 }
 QToolButton[cssClass="primary"]:pressed {
-    background-color: #1857d1;
+    background-color: __ACCENT_PRESSED__;
 }
 QToolButton::menu-button {
     border: none;
@@ -526,7 +570,7 @@ QLabel {
     color: #4c4f69;
 }
 QLabel[cssClass="heading"] {
-    color: #1e66f5;
+    color: __ACCENT__;
 }
 QLabel[cssClass="muted"] {
     color: #6c6f85;
@@ -576,11 +620,11 @@ QCheckBox::indicator {
     background-color: #ffffff;
 }
 QCheckBox::indicator:hover {
-    border-color: #1e66f5;
+    border-color: __ACCENT__;
 }
 QCheckBox::indicator:checked {
-    background-color: #1e66f5;
-    border-color: #1e66f5;
+    background-color: __ACCENT__;
+    border-color: __ACCENT__;
 }
 QListWidget {
     background-color: #ffffff;
@@ -597,7 +641,7 @@ QListWidget::item:hover {
     background-color: #e6e9ef;
 }
 QListWidget::item:selected {
-    background-color: #1e66f5;
+    background-color: __ACCENT__;
     color: #eff1f5;
 }
 QScrollBar:vertical {
@@ -654,11 +698,11 @@ QLabel[cssClass="time-value"] {
     color: #4c4f69;
 }
 QLabel[cssClass="time-value"]:hover {
-    color: #1e66f5;
+    color: __ACCENT__;
 }
 QWidget[cssClass="update-banner"] {
-    background-color: #1e66f5;
-    border-bottom: 1px solid #1857d1;
+    background-color: __ACCENT__;
+    border-bottom: 1px solid __ACCENT_PRESSED__;
 }
 QLabel[cssClass="update-banner-text"] {
     color: #eff1f5;
@@ -695,13 +739,20 @@ QPushButton[cssClass="panel-toggle"]:hover {
 """
 
 
-def stylesheet_for(theme: str) -> str:
-    """Resolves a theme name (as stored in settings) to a Qt stylesheet."""
+def stylesheet_for(theme: str, accent_color: str = DEFAULT_ACCENT_COLOR) -> str:
+    """Resolves a theme name (as stored in settings) to a Qt stylesheet.
+
+    Args:
+        theme (str): Name of the theme ("Dark", "Light", or "Automatic").
+        accent_color (str): User-selected accent color as a "#rrggbb" hex string.
+    """
     match theme:
         case "Dark":
-            return DARK_PALETTE
+            palette = DARK_PALETTE
         case "Light":
-            return LIGHT_PALETTE
+            palette = LIGHT_PALETTE
         case _:
             # "Automatic" and any unrecognized value both follow the OS theme.
-            return DARK_PALETTE if is_dark_mode() else LIGHT_PALETTE
+            palette = DARK_PALETTE if is_dark_mode() else LIGHT_PALETTE
+
+    return _with_accent(palette, accent_color or DEFAULT_ACCENT_COLOR)

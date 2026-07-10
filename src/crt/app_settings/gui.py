@@ -1,13 +1,18 @@
+# Standard library
+from typing import NoReturn
+
 # Third-party
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QCheckBox, QComboBox, QFrame, QWidget, QSizePolicy
+    QPushButton, QCheckBox, QComboBox, QFrame, QWidget, QSizePolicy,
+    QColorDialog
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 
 # Local application
 from crt.base_gui import BaseGUI
+from crt.theme import DEFAULT_ACCENT_COLOR
 
 
 class SettingsDialog(QDialog):
@@ -67,6 +72,25 @@ class SettingsDialog(QDialog):
         row1.addWidget(self.theme)
         layout.addLayout(row1)
 
+        # Accent color
+        row1b = QHBoxLayout()
+        row1b.setSpacing(8)
+        spacer1b = QWidget(); spacer1b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        row1b.addWidget(spacer1b)
+        lbl_accent = QLabel(c["Accent Color"])
+        lbl_accent.setFont(QFont("Segoe UI", 13))
+        row1b.addWidget(lbl_accent)
+        self._accent_color = settings.get("accent_color", DEFAULT_ACCENT_COLOR)
+        self.accent_color_button = QPushButton(self._accent_color)
+        self.accent_color_button.setObjectName("accent_color")
+        self.accent_color_button.setFont(QFont("Segoe UI", 12))
+        self.accent_color_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.accent_color_button.setMinimumWidth(90)
+        self.accent_color_button.clicked.connect(self._pick_accent_color)
+        self._update_accent_button()
+        row1b.addWidget(self.accent_color_button)
+        layout.addLayout(row1b)
+
         # Language
         row2 = QHBoxLayout()
         row2.setSpacing(8)
@@ -125,11 +149,32 @@ class SettingsDialog(QDialog):
             btn_row.addWidget(btn)
         layout.addLayout(btn_row)
 
+    def _update_accent_button(self) -> NoReturn:
+        """Refreshes the accent color button's swatch color, label, and text contrast."""
+        color = QColor(self._accent_color)
+        # Standard relative luminance threshold for picking readable text on a color swatch.
+        luminance = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
+        text_color = "#000000" if luminance > 140 else "#ffffff"
+        self.accent_color_button.setText(self._accent_color)
+        self.accent_color_button.setStyleSheet(
+            f"background-color: {self._accent_color}; color: {text_color}; "
+            f"border: 1px solid {text_color}; padding: 6px;"
+        )
+        self.accent_color_button.adjustSize()
+
+    def _pick_accent_color(self) -> NoReturn:
+        """Opens a hex color picker dialog and stores the chosen accent color."""
+        color = QColorDialog.getColor(QColor(self._accent_color), self, "Select Accent Color")
+        if color.isValid():
+            self._accent_color = color.name()
+            self._update_accent_button()
+
     def get_values(self) -> dict:
         """Returns current widget values as a dict compatible with the Settings controller."""
         return {
             "enable_updates": self.enable_updates.isChecked(),
             "theme": self.theme.currentText(),
+            "accent_color": self._accent_color,
             "language": self.language.currentText(),
             "mod_note_format": self.mod_note_format.text(),
         }

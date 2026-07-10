@@ -10,6 +10,7 @@ import appdirs
 from crt.language import Language
 from crt.app_settings.gui import SettingsGUI
 from crt.popups import popup_yes_no as _popup_yes_no
+from crt.theme import DEFAULT_ACCENT_COLOR
 
 
 class Settings:
@@ -23,6 +24,7 @@ class Settings:
         self.defaults = {
             "enable_updates": "True",
             "theme": "Automatic",
+            "accent_color": DEFAULT_ACCENT_COLOR,
             "language": "en",
             "mod_note_format": (
                 "Mod Note {time_without_loads} without loads, and {time_with_loads} "
@@ -77,6 +79,7 @@ class Settings:
         with open(self.file_path, "w") as file:
             self.config.set("Settings", "enable_updates", str(values["enable_updates"]))
             self._apply_theme(values["theme"])
+            self.config.set("Settings", "accent_color", str(values["accent_color"]))
             self.config.set("Settings", "language", str(values["language"]))
             self.config.set("Settings", "mod_note_format", str(values["mod_note_format"]))
             self.config.write(file)
@@ -88,6 +91,7 @@ class Settings:
             self._settings_cache = {
                 "enable_updates": self.config.getboolean("Settings", "enable_updates"),
                 "theme": self.config.get("Settings", "theme"),
+                "accent_color": self.config.get("Settings", "accent_color"),
                 "language": self.config.get("Settings", "language"),
                 "mod_note_format": self.config.get("Settings", "mod_note_format")
             }

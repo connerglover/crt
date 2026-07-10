@@ -73,7 +73,7 @@ class App:
         }
 
         # Apply theme via stylesheet
-        self._apply_theme(self.settings_dict["theme"])
+        self._apply_theme(self.settings_dict["theme"], self.settings_dict["accent_color"])
 
         self.language = self.settings.language
         self.window = MainGUI(self.language.content)
@@ -101,9 +101,9 @@ class App:
         # visible jump. Refresh once up front so the sidebar starts in its final state.
         self._refresh_load_sidebar()
 
-    def _apply_theme(self, theme: str):
+    def _apply_theme(self, theme: str, accent_color: str):
         """Applies a Qt stylesheet theme."""
-        self._qt_app.setStyleSheet(stylesheet_for(theme))
+        self._qt_app.setStyleSheet(stylesheet_for(theme, accent_color))
 
     @error_handler
     def _on_load_edited(self, index: int, start_text: str, end_text: str) -> NoReturn:
