@@ -13,12 +13,14 @@ from crt.base_gui import BaseGUI
 class SettingsDialog(QDialog):
     """Settings dialog for CRT."""
 
-    def __init__(self, settings: dict, content: dict, parent=None):
+    def __init__(self, settings: dict, content: dict, parent=None, on_top: bool = False):
         super().__init__(parent)
         self.content = content
         self.setWindowTitle("CRT Settings")
         self.setFixedWidth(500)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        if on_top:
+            self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self._build_ui(settings, content)
 
     def _build_ui(self, settings: dict, content: dict):
@@ -136,8 +138,8 @@ class SettingsDialog(QDialog):
 class SettingsGUI(BaseGUI):
     """Wrapper around SettingsDialog to match the BaseGUI interface."""
 
-    def __init__(self, settings: dict, content: dict):
-        self.window = SettingsDialog(settings, content)
+    def __init__(self, settings: dict, content: dict, parent=None, on_top: bool = False):
+        self.window = SettingsDialog(settings, content, parent, on_top)
         self._connect_signals()
 
     def _connect_signals(self):

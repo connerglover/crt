@@ -83,6 +83,8 @@ class App:
         if Path(icon_path).exists():
             self.window.window.setWindowIcon(QIcon(icon_path))
 
+        self._always_on_top = False
+
         # The loads sidebar defaults both its empty-state message and its (empty)
         # scroll area to visible until refresh_loads() runs once to reconcile them —
         # without this, the first dispatch (e.g. clicking off any input) collapses the
@@ -130,7 +132,10 @@ class App:
                 self._load_stats['total_loads'] = len(time.loads)
 
             if (end_frame - start_frame) > self._load_stats['avg_length'] * 10:
-                if not _popup_yes_no("Woah!", "This load is concerningly long. Would you like to add the load anyway?"):
+                if not _popup_yes_no(
+                    "Woah!", "This load is concerningly long. Would you like to add the load anyway?",
+                    self.window.window, self._always_on_top
+                ):
                     return
 
         time.add_load(start_frame, end_frame)
@@ -138,7 +143,7 @@ class App:
         self._set_input("start_loads", "0")
         self._set_input("end_loads", "0")
         self._update_displays()
-        _popup_ok("Loads", "Load added successfully.")
+        _popup_ok("Loads", "Load added successfully.", self.window.window, self._always_on_top)
 
     # ── Input parsing helpers ──────────────────────────────────────────────────
 
@@ -208,7 +213,10 @@ class App:
         """
         if not self.files.dirty:
             return True
-        if not _popup_yes_no(title, "Would you like to save the current time first?"):
+        if not _popup_yes_no(
+            title, "Would you like to save the current time first?",
+            self.window.window, self._always_on_top
+        ):
             return True
         self._save_time()
         return not self.files.dirty
@@ -275,7 +283,9 @@ class App:
     @error_handler
     def _session_history(self) -> NoReturn:
         """Opens the session history and switches to the selected file, if any."""
-        session_history = SessionHistory(self.language, self.files.history())
+        session_history = SessionHistory(
+            self.language, self.files.history(), self.window.window, self._always_on_top
+        )
         selected_file_path = session_history.run()
 
         if not selected_file_path or selected_file_path == self.files.file_path:
@@ -297,15 +307,19 @@ class App:
         win = self.window.window
         win.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
         win.show()
+        self._always_on_top = enabled
 
     def _settings(self) -> NoReturn:
         """Opens the settings."""
         old_settings_dict = self.settings_dict
-        self.settings.open_window()
+        self.settings.open_window(self.window.window, self._always_on_top)
         self.settings_dict = self.settings.config_to_dict()
 
         if self.settings_dict != old_settings_dict:
-            _popup_ok("Settings", "Please restart the application to apply the changes.")
+            _popup_ok(
+                "Settings", "Please restart the application to apply the changes.",
+                self.window.window, self._always_on_top
+            )
 
     # ── Mod note ───────────────────────────────────────────────────────────────
 
@@ -369,7 +383,7 @@ class App:
 
     def _show_error(self, message):
         """Shows a popup message of the error."""
-        _popup_error("Error", message)
+        _popup_error("Error", message, self.window.window, self._always_on_top)
 
     def _get_all_values(self) -> dict:
         """Reads all input values from the main window."""
@@ -428,7 +442,9 @@ class App:
         self._qt_app.exec()
 
         # On exit, offer to save unsaved changes
-        if self.files.dirty and _popup_yes_no("Exit", "Would you like to save?"):
+        if self.files.dirty and _popup_yes_no(
+            "Exit", "Would you like to save?", self.window.window, self._always_on_top
+        ):
             self._save_time()
 
     def _dispatch(self, event: str, values: dict):
@@ -453,7 +469,7 @@ class App:
             case "Always on Top":
                 self._set_always_on_top(self.window.window.action_always_on_top.isChecked())
             case "Check for Updates":
-                check_for_updates()
+                check_for_updates(self.window.window, self._always_on_top)
             case "About":
                 _popup_ok(
                     "About",
@@ -461,7 +477,8 @@ class App:
                     "Created by Conner Glover\n\n"
                     "Credits:\nMenzo: French and Polish Translations\n"
                     "AmazinCris: Spanish Translations\n\n"
-                    "© 2024 Conner Glover"
+                    "© 2024 Conner Glover",
+                    self.window.window, self._always_on_top
                 )
             case "Add Loads":
                 self._add_loads(values)

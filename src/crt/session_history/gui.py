@@ -15,11 +15,13 @@ from crt.base_gui import BaseGUI
 class SessionHistoryDialog(QDialog):
     """Session history dialog for CRT."""
 
-    def __init__(self, past_file_paths: list, content: dict, parent=None):
+    def __init__(self, past_file_paths: list, content: dict, parent=None, on_top: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Session History")
         self.setFixedSize(560, 300)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        if on_top:
+            self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self._build_ui(past_file_paths, content)
 
     def _build_ui(self, past_file_paths: list, content: dict):
@@ -42,8 +44,8 @@ class SessionHistoryDialog(QDialog):
 class SessionHistoryGUI(BaseGUI):
     """Wrapper around SessionHistoryDialog to match the BaseGUI/event-loop interface."""
 
-    def __init__(self, past_file_paths: list, content: dict):
-        self.window = SessionHistoryDialog(past_file_paths, content)
+    def __init__(self, past_file_paths: list, content: dict, parent=None, on_top: bool = False):
+        self.window = SessionHistoryDialog(past_file_paths, content, parent, on_top)
         self._connect_signals()
 
     def _connect_signals(self):

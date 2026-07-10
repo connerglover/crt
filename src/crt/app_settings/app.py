@@ -42,10 +42,13 @@ class Settings:
 
         self.language = Language(self.config.get("Settings", "language"))
 
-    def _restore_defaults(self, prompt: Optional[bool] = True) -> NoReturn:
+    def _restore_defaults(self, prompt: Optional[bool] = True, parent=None, on_top: bool = False) -> NoReturn:
         """Restores the settings back to the defaults."""
         if prompt:
-            if not _popup_yes_no("Restore Defaults", "Are you sure you want to restore the default settings?"):
+            if not _popup_yes_no(
+                "Restore Defaults", "Are you sure you want to restore the default settings?",
+                parent, on_top
+            ):
                 return
 
         self.config = ConfigParser()
@@ -106,21 +109,21 @@ class Settings:
                 self.config.write(file)
             self._settings_cache = None
 
-    def open_window(self) -> NoReturn:
+    def open_window(self, parent=None, on_top: bool = False) -> NoReturn:
         """Opens the settings window."""
         settings = self.config_to_dict()
-        self.window = SettingsGUI(settings, self.language.content)
+        self.window = SettingsGUI(settings, self.language.content, parent, on_top)
 
         while True:
             event, values = self.window.read()
 
             match event:
                 case "Restore Defaults":
-                    self._restore_defaults()
+                    self._restore_defaults(True, parent, on_top)
                     # Re-open with fresh defaults
                     self.window.close()
                     settings = self.config_to_dict()
-                    self.window = SettingsGUI(settings, self.language.content)
+                    self.window = SettingsGUI(settings, self.language.content, parent, on_top)
 
                 case "Apply":
                     self._apply(values)

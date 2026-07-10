@@ -9,12 +9,12 @@ from crt.language import Language
 class SessionHistory:
     """Session history for CRT."""
 
-    def __init__(self, language: Language, past_file_paths: list) -> NoReturn:
+    def __init__(self, language: Language, past_file_paths: list, parent=None, on_top: bool = False) -> NoReturn:
         """Initializes the SessionHistory class."""
         if not past_file_paths:
             raise ValueError("No session history.")
 
-        self.window = SessionHistoryGUI(past_file_paths, language.content)
+        self.window = SessionHistoryGUI(past_file_paths, language.content, parent, on_top)
 
     def run(self) -> str:
         """Runs the session history dialog.
