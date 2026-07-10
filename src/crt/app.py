@@ -441,6 +441,7 @@ class App:
         # Action buttons
         win.btn_copy_mod_note.clicked.connect(lambda: self._dispatch("Copy Mod Note", {}))
         win.btn_add_loads.clicked.connect(lambda: self._dispatch("Add Loads", self._get_all_values()))
+        win.btn_clear_loads.clicked.connect(lambda: self._dispatch("Clear Loads", {}))
 
         # Embedded loads sidebar — live inline editing, no modal dialog
         win.load_edited.connect(self._on_load_edited)

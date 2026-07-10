@@ -151,6 +151,11 @@ QPushButton[cssClass="danger-compact"]:hover {
 QPushButton[cssClass="danger-compact"]:pressed {
     background-color: rgba(224, 108, 117, 0.28);
 }
+QPushButton[cssClass="danger-compact"]:disabled {
+    color: #6e6e6e;
+    background-color: transparent;
+    border-color: #2e2e2e;
+}
 QLabel {
     color: #d4d4d4;
 }
@@ -445,6 +450,11 @@ QPushButton[cssClass="danger-compact"]:hover {
 }
 QPushButton[cssClass="danger-compact"]:pressed {
     background-color: rgba(210, 15, 57, 0.20);
+}
+QPushButton[cssClass="danger-compact"]:disabled {
+    color: #9ca0b0;
+    background-color: transparent;
+    border-color: #e6e9ef;
 }
 QLabel {
     color: #4c4f69;

@@ -12,6 +12,7 @@ from PySide6.QtGui import QAction, QFont
 
 # Local application
 from crt.base_gui import BaseGUI
+from crt.decorators import format_iso
 
 
 class ClickableLabel(QLabel):
@@ -49,7 +50,7 @@ class LoadSidebarRow(QWidget):
                 t = round(d(self.load.length) / d(self.framerate), self.precision)
             else:
                 t = d(0)
-            return str(t)
+            return format_iso(t)
         except Exception:
             return "0"
 
@@ -124,7 +125,7 @@ class MainWindow(QMainWindow):
     update_link_clicked = Signal()
 
     _BASE_WIDTH = 900
-    _BASE_HEIGHT = 530
+    _BASE_HEIGHT = 494
     _UPDATE_BANNER_HEIGHT = 34
     _DEFAULT_MAIN_PANEL_WIDTH = 540
     _DEFAULT_LOADS_PANEL_WIDTH = 300
@@ -297,10 +298,23 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(12, 14, 16, 16)
         layout.setSpacing(8)
 
+        header_row = QHBoxLayout()
+        header_row.setSpacing(8)
+
         header = QLabel(c.get("Loads", "Loads"))
         header.setProperty("cssClass", "heading")
         header.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
-        layout.addWidget(header)
+        header_row.addWidget(header)
+        header_row.addStretch(1)
+
+        self.btn_clear_loads = QPushButton(c["Clear Loads"])
+        self.btn_clear_loads.setObjectName("Clear Loads")
+        self.btn_clear_loads.setProperty("cssClass", "danger-compact")
+        self.btn_clear_loads.setFont(QFont("Segoe UI", 9))
+        self.btn_clear_loads.setEnabled(False)
+        header_row.addWidget(self.btn_clear_loads)
+
+        layout.addLayout(header_row)
 
         self._loads_summary = QLabel("")
         self._loads_summary.setProperty("cssClass", "muted")
@@ -356,6 +370,7 @@ class MainWindow(QMainWindow):
         has_loads = bool(loads)
         self._loads_empty_container.setVisible(not has_loads)
         self._loads_scroll.setVisible(has_loads)
+        self.btn_clear_loads.setEnabled(has_loads)
 
         n = len(loads)
         self._loads_summary.setText(f"{n} load{'s' if n != 1 else ''}" if n else "")

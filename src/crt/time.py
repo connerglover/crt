@@ -4,7 +4,7 @@ from typing import Optional, NoReturn
 
 # Local application
 from crt.load import Load
-from crt.decorators import validate_load, format_time
+from crt.decorators import validate_load, format_time, format_iso
 
 class Time:
     """
@@ -160,21 +160,14 @@ class Time:
         """        
         return f"{hours}h {minutes}m {seconds}s {ms}ms"
     
-    @format_time 
-    def iso_format(self, hours: str, minutes: str, seconds: str, ms: str) -> str:
+    def iso_format(self, loads: bool = False) -> str:
         """Formats the time into ISO Format
 
         Args:
-            hours (str): String of hours
-            minutes (str): String of minutes
-            seconds (str): String of seconds
-            ms (str): String of Milliseconds
+            loads (bool): Whether to format the time excluding loads.
 
         Returns:
             str: Formatted time
         """
-        if int(hours) > 0:
-            return f"{hours}:{minutes}:{seconds}.{ms}"
-        elif int(minutes) > 0:
-            return f"{minutes}:{seconds}.{ms}"
-        return f"{seconds}.{ms}"
+        time_value = self.without_loads if loads else self.with_loads
+        return format_iso(time_value)
