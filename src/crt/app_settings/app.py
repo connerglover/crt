@@ -27,8 +27,7 @@ class Settings:
             "accent_color": DEFAULT_ACCENT_COLOR,
             "language": "en",
             "mod_note_format": (
-                "Mod Note {time_without_loads} without loads, and {time_with_loads} "
-                "with loads at {fps} FPS using {plug}"
+                "Mod Note: Retimed to {time_without_loads}"
             )
         }
 
