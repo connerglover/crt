@@ -159,6 +159,8 @@ class MainWindow(QMainWindow):
 
         edit_menu = menubar.addMenu(c["Edit (Menu Bar)"])
         self._add_action(edit_menu, c["Copy Mod Note"],   "Copy Mod Note")
+        self._add_action(edit_menu, c["Copy Discord Message"],   "Copy Discord Message")
+        self._add_action(edit_menu, c["Copy YouTube Chapters"],  "Copy YouTube Chapters")
         edit_menu.addSeparator()
         self._add_action(edit_menu, c["Clear Loads"],     "Clear Loads")
 
@@ -283,12 +285,8 @@ class MainWindow(QMainWindow):
         self.btn_copy_mod_note.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
 
         copy_menu = QMenu(self.btn_copy_mod_note)
-        self._add_action(
-            copy_menu, c.get("Copy Discord Message", "Copy Discord Message"), "Copy Discord Message"
-        )
-        self._add_action(
-            copy_menu, c.get("Copy YouTube Chapters", "Copy YouTube Chapters"), "Copy YouTube Chapters"
-        )
+        self._add_action(copy_menu, c["Copy Discord Message"], "Copy Discord Message")
+        self._add_action(copy_menu, c["Copy YouTube Chapters"], "Copy YouTube Chapters")
         self.btn_copy_mod_note.setMenu(copy_menu)
 
         self.btn_add_loads = QPushButton(c["Add Loads"])
@@ -482,6 +480,36 @@ class MainWindow(QMainWindow):
         action.setData(key)
         menu.addAction(action)
         return action
+
+    def menu_bar_actions(self) -> dict:
+        """Maps dispatch key -> QAction for every leaf action reachable from the menu bar.
+
+        Some dispatch keys (e.g. "Copy Discord Message") back two QAction instances —
+        one in the Edit menu, one in the Copy Mod Note dropdown — since both were built
+        via _add_action with the same key. Walking only the menu bar's own menu tree
+        (and skipping the dropdown, which hangs off btn_copy_mod_note instead) gives a
+        single canonical QAction per key, which callers need when assigning shortcuts:
+        setting the same QKeySequence on both instances would make Qt treat it as an
+        ambiguous shortcut and silently refuse to fire either one.
+        """
+        result = {}
+
+        def _walk(menu: QMenu):
+            for action in menu.actions():
+                submenu = action.menu()
+                if submenu:
+                    _walk(submenu)
+                else:
+                    key = action.data()
+                    if key:
+                        result[key] = action
+
+        for top_action in self.menuBar().actions():
+            submenu = top_action.menu()
+            if submenu:
+                _walk(submenu)
+
+        return result
 
     def _make_time_display(self, label_text: str, key: str, default: str,
                            tooltip: str) -> tuple[QWidget, ClickableLabel]:

@@ -9,6 +9,7 @@ import appdirs
 # Local application
 from crt.language import Language
 from crt.app_settings.gui import SettingsGUI
+from crt.hotkeys import DEFAULT_HOTKEYS, HOTKEY_OPTION_NAMES
 from crt.popups import popup_yes_no as _popup_yes_no
 from crt.theme import DEFAULT_ACCENT_COLOR
 
@@ -40,6 +41,7 @@ class Settings:
 
         self._settings_cache = None
         self._sync_missing_settings()
+        self._sync_missing_hotkeys()
 
         self.language = Language(self.config.get("Settings", "language"))
 
@@ -56,6 +58,9 @@ class Settings:
         self.config.add_section("Settings")
         for key, value in self.defaults.items():
             self.config.set("Settings", key, value)
+        self.config.add_section("Hotkeys")
+        for action_id, shortcut in DEFAULT_HOTKEYS.items():
+            self.config.set("Hotkeys", HOTKEY_OPTION_NAMES[action_id], shortcut)
         with open(self.file_path, "w") as file:
             self.config.write(file)
         self._settings_cache = None
@@ -81,6 +86,12 @@ class Settings:
             self.config.set("Settings", "accent_color", str(values["accent_color"]))
             self.config.set("Settings", "language", str(values["language"]))
             self.config.set("Settings", "mod_note_format", str(values["mod_note_format"]))
+
+            if not self.config.has_section("Hotkeys"):
+                self.config.add_section("Hotkeys")
+            for action_id, shortcut in values.get("hotkeys", {}).items():
+                self.config.set("Hotkeys", HOTKEY_OPTION_NAMES[action_id], str(shortcut))
+
             self.config.write(file)
         self._settings_cache = None
 
@@ -92,7 +103,13 @@ class Settings:
                 "theme": self.config.get("Settings", "theme"),
                 "accent_color": self.config.get("Settings", "accent_color"),
                 "language": self.config.get("Settings", "language"),
-                "mod_note_format": self.config.get("Settings", "mod_note_format")
+                "mod_note_format": self.config.get("Settings", "mod_note_format"),
+                "hotkeys": {
+                    action_id: self.config.get(
+                        "Hotkeys", HOTKEY_OPTION_NAMES[action_id], fallback=default
+                    )
+                    for action_id, default in DEFAULT_HOTKEYS.items()
+                }
             }
         return self._settings_cache
 
@@ -105,6 +122,23 @@ class Settings:
         for key, value in self.defaults.items():
             if not self.config.has_option("Settings", key):
                 self.config.set("Settings", key, value)
+                updated = True
+
+        if updated:
+            with open(self.file_path, "w") as file:
+                self.config.write(file)
+            self._settings_cache = None
+
+    def _sync_missing_hotkeys(self) -> NoReturn:
+        """Syncs the hotkeys that aren't present in the config file."""
+        if not self.config.has_section("Hotkeys"):
+            self.config.add_section("Hotkeys")
+
+        updated = False
+        for action_id, shortcut in DEFAULT_HOTKEYS.items():
+            option = HOTKEY_OPTION_NAMES[action_id]
+            if not self.config.has_option("Hotkeys", option):
+                self.config.set("Hotkeys", option, shortcut)
                 updated = True
 
         if updated:

@@ -9,16 +9,20 @@ from PySide6.QtWidgets import (
     QApplication, QFileDialog, QLineEdit, QPushButton
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QGuiApplication, QIcon
+from PySide6.QtGui import QAction, QGuiApplication, QIcon, QKeySequence, QShortcut
 
 # Local application
 from crt._version import __version__
+from crt.app.gui import ClickableLabel, MainGUI
 from crt.app_settings.app import Settings
 from crt.decorators import error_handler, format_components, format_frame_time
 from crt.file_manager import FileManager
 from crt.frame_input import clean_framerate, parse_frame_input
-from crt.gui import ClickableLabel, MainGUI
-from crt.popups import popup_yes_no as _popup_yes_no, popup_ok as _popup_ok, popup_error as _popup_error
+from crt.hotkeys import DEFAULT_HOTKEYS, HOTKEY_ACTIONS, MENU_ACTION_IDS
+from crt.popups import (
+    popup_yes_no as _popup_yes_no, popup_yes_no_cancel as _popup_yes_no_cancel,
+    popup_ok as _popup_ok, popup_error as _popup_error
+)
 from crt.session_history import SessionHistory
 from crt.theme import stylesheet_for
 from crt.updater import check_for_updates, open_releases_page
@@ -35,7 +39,7 @@ def _icon_path() -> str:
     """
     base_path = getattr(sys, "_MEIPASS", None)
     if base_path is None:
-        base_path = Path(__file__).resolve().parent.parent
+        base_path = Path(__file__).resolve().parent.parent.parent
     return str(Path(base_path) / "icon.ico")
 
 
@@ -214,19 +218,27 @@ class App:
 
         Only asks when there's actually something unsaved — the old behavior asked
         unconditionally whenever a file happened to be open, even with no changes.
+        Gives a genuine way to back out (Cancel) rather than forcing a choice
+        between saving and discarding, e.g. for an accidental File > New Time.
 
         Returns:
-            bool: False if the user backed out of saving (e.g. cancelled the file
-                picker), meaning the caller should abort the destructive action
-                rather than discard unsaved work.
+            bool: False if the user cancelled the dialog outright, or backed out
+                of saving (e.g. cancelled the file picker), meaning the caller
+                should abort the destructive action rather than discard unsaved
+                work. True if it's safe to proceed.
         """
         if not self.files.dirty:
             return True
-        if not _popup_yes_no(
+
+        choice = _popup_yes_no_cancel(
             title, "Would you like to save the current time first?",
             self.window.window, self._always_on_top
-        ):
+        )
+        if choice == "cancel":
+            return False
+        if choice == "no":
             return True
+
         self._save_time()
         return not self.files.dirty
 
@@ -467,6 +479,37 @@ class App:
             for key in ("framerate", "start", "end", "start_loads", "end_loads")
         }
 
+    # ── Hotkeys ─────────────────────────────────────────────────────────────────
+
+    def _apply_hotkeys(self, win) -> NoReturn:
+        """Binds the user's configured key sequences to their actions.
+
+        Menu-backed actions (MENU_ACTION_IDS) get their shortcut set directly on
+        the QAction, via win.menu_bar_actions(), so it also shows next to the menu
+        entry and so the Copy Mod Note dropdown's duplicate QAction doesn't also
+        receive it (which would make Qt treat the shortcut as ambiguous). Everything
+        else is a plain button with no QAction behind it, so a standalone QShortcut
+        is bound instead and dispatched the same way a QAction trigger would be.
+        """
+        hotkeys = self.settings_dict.get("hotkeys", DEFAULT_HOTKEYS)
+        menu_actions = win.menu_bar_actions()
+
+        # Keep references alive — QShortcut is tied to its parent's lifetime, but
+        # nothing else on self.window would otherwise hold onto these objects.
+        self._hotkey_shortcuts = []
+
+        for action_id, _, default in HOTKEY_ACTIONS:
+            sequence = QKeySequence(hotkeys.get(action_id, default))
+
+            if action_id in MENU_ACTION_IDS:
+                action = menu_actions.get(action_id)
+                if action:
+                    action.setShortcut(sequence)
+            else:
+                shortcut = QShortcut(sequence, win)
+                shortcut.activated.connect(lambda k=action_id: self._dispatch(k, self._get_all_values()))
+                self._hotkey_shortcuts.append(shortcut)
+
     # ── Main event loop ────────────────────────────────────────────────────────
 
     def run(self) -> NoReturn:
@@ -480,6 +523,9 @@ class App:
         # Connect all QActions from all menus
         for action in win.findChildren(QAction):
             action.triggered.connect(lambda checked=False, a=action: _on_menu_action(a))
+
+        # Customizable keyboard shortcuts (Settings > Customize Hotkeys)
+        self._apply_hotkeys(win)
 
         # Input fields — use editingFinished so we only validate on focus-out / Enter
         # but also connect textEdited for live load-field cleaning

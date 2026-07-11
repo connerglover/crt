@@ -25,6 +25,24 @@ def popup_yes_no(title: str, message: str, parent=None, on_top: bool = False) ->
     return box.exec() == QMessageBox.StandardButton.Yes
 
 
+def popup_yes_no_cancel(title: str, message: str, parent=None, on_top: bool = False) -> str:
+    """Shows a Yes/No/Cancel message box. Returns "yes", "no", or "cancel"."""
+    box = QMessageBox(parent)
+    box.setWindowTitle(title)
+    box.setText(message)
+    box.setStandardButtons(
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+    )
+    box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+    _apply_on_top(box, on_top)
+    result = box.exec()
+    if result == QMessageBox.StandardButton.Yes:
+        return "yes"
+    if result == QMessageBox.StandardButton.No:
+        return "no"
+    return "cancel"
+
+
 def popup_ok(title: str, message: str, parent=None, on_top: bool = False):
     """Shows an informational popup."""
     box = QMessageBox(parent)

@@ -12,6 +12,7 @@ from PySide6.QtGui import QFont, QColor
 
 # Local application
 from crt.base_gui import BaseGUI
+from crt.hotkeys import DEFAULT_HOTKEYS, HotkeysDialog
 from crt.theme import DEFAULT_ACCENT_COLOR
 
 
@@ -21,6 +22,8 @@ class SettingsDialog(QDialog):
     def __init__(self, settings: dict, content: dict, parent=None, on_top: bool = False):
         super().__init__(parent)
         self.content = content
+        self._on_top = on_top
+        self._hotkeys = dict(settings.get("hotkeys", DEFAULT_HOTKEYS))
         self.setWindowTitle("CRT Settings")
         self.setFixedWidth(500)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -127,6 +130,18 @@ class SettingsDialog(QDialog):
         row3.addWidget(self.mod_note_format)
         layout.addLayout(row3)
 
+        # Hotkeys
+        row4 = QHBoxLayout()
+        row4.setSpacing(8)
+        spacer4 = QWidget(); spacer4.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        row4.addWidget(spacer4)
+        self.btn_hotkeys = QPushButton(c.get("Customize Hotkeys", "Customize Hotkeys") + "...")
+        self.btn_hotkeys.setObjectName("Customize Hotkeys")
+        self.btn_hotkeys.setFont(QFont("Segoe UI", 12))
+        self.btn_hotkeys.clicked.connect(self._open_hotkeys_dialog)
+        row4.addWidget(self.btn_hotkeys)
+        layout.addLayout(row4)
+
         # Separator
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -169,6 +184,12 @@ class SettingsDialog(QDialog):
             self._accent_color = color.name()
             self._update_accent_button()
 
+    def _open_hotkeys_dialog(self) -> NoReturn:
+        """Opens the hotkeys rebinding dialog and stores the result if confirmed."""
+        dialog = HotkeysDialog(self._hotkeys, self.content, self, self._on_top)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._hotkeys = dialog.get_values()
+
     def get_values(self) -> dict:
         """Returns current widget values as a dict compatible with the Settings controller."""
         return {
@@ -177,6 +198,7 @@ class SettingsDialog(QDialog):
             "accent_color": self._accent_color,
             "language": self.language.currentText(),
             "mod_note_format": self.mod_note_format.text(),
+            "hotkeys": self._hotkeys,
         }
 
 
