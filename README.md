@@ -1,40 +1,50 @@
-# Conner's Retime Tool (CRT)
+<div align="center">
+  <img src="src/icon.ico" width="84" alt="CRT icon" />
 
-[![License: MIT](https://img.shields.io/github/license/connerglover/crt)](LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/connerglover/crt)](https://github.com/connerglover/crt/releases/latest)
+  # Conner's Retime Tool
 
-CRT is a tool that aids speedrunners and moderators in finding the accurate time of a speedrun with or without loads.
+  <b>A desktop app for speedrunners and moderators to time runs accurately — with or without loads.</b>
 
-## Features
+  <p>
+    <a href="https://github.com/connerglover/crt/releases/latest"><img src="https://img.shields.io/github/v/release/connerglover/crt?style=flat-square&color=6f42c1" alt="Latest Release" /></a>
+    <a href="https://github.com/connerglover/crt/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/connerglover/crt/build.yml?style=flat-square" alt="Build Status" /></a>
+    <a href="https://github.com/connerglover/crt/releases"><img src="https://img.shields.io/github/downloads/connerglover/crt/total?style=flat-square" alt="Downloads" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/connerglover/crt?style=flat-square" alt="License: MIT" /></a>
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6f42c1?style=flat-square" alt="Platforms" />
+  </p>
 
-- Time a run by frame or by pasting a timestamp/YouTube debug string directly into a field
-- Track and edit individual loads, with automatic totals for time with and without loads
-- Generate a customizable mod note (see [Mod Note Format.MD](Mod%20Note%20Format.MD) for the available placeholders)
-- Save/load sessions to a file and revisit recent sessions from Session History
-- Available in English, Français, Polski, and Español
-- Always on Top mode keeps CRT above other windows
-- Automatic update checks against the latest GitHub release
+  <img src=".github/assets/screenshot.png" width="600" alt="CRT screenshot" />
+</div>
 
-## Installation
+## ✨ Features
 
-1. Navigate to the [releases](https://github.com/connerglover/crt/releases/) page, here is every binary of CRT.
-2. Locate your desired binary, the version is indicated by the title of each release, as every binary is named the same.
-3. Once the binary has been located, click on its name to download it. Once the download has finished, open the file.
+- Time a run by frame, or by pasting a timestamp / YouTube debug string
+- Track individual loads with automatic totals, with and without loads
+- Customizable mod note format ([available placeholders](Mod%20Note%20Format.MD))
+- Fully customizable hotkeys for every action
+- Session history — save, reload, and revisit past runs
+- Always-on-top mode and automatic update checks
+- English, Français, Polski, and Español
 
-## Running from Source
+## 📦 Installation
 
-CRT targets Python 3.10+.
+Grab the latest build for your platform from [Releases](https://github.com/connerglover/crt/releases/latest) and run it.
+
+## 🐍 Running from Source
+
+Requires Python 3.10+.
 
 ```bash
 pip install -r requirements.txt
 python src/main.py
 ```
 
-## Building the Executable
+## 🔨 Building the Executable
 
-Windows, macOS, and Linux binaries are built with [PyInstaller](https://pyinstaller.org/) and are produced automatically by the [build workflow](.github/workflows/build.yml) on every push to `main`, and attached to a GitHub Release whenever a version tag (e.g. `1.2.0` or `1.2.0-rc1`) is pushed. To build one yourself:
+Windows, macOS, and Linux binaries are built automatically by the [build workflow](.github/workflows/build.yml) and attached to a GitHub Release whenever a version tag (e.g. `1.2.2`) is pushed. To build locally:
 
-### Windows
+<details>
+<summary><b>🪟 Windows</b></summary>
 
 ```bash
 pip install -r requirements.txt pyinstaller
@@ -42,9 +52,12 @@ cd src
 pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt main.py
 ```
 
-The resulting executable is written to `src/dist/crt.exe`.
+Output: `src/dist/crt.exe`
 
-### macOS
+</details>
+
+<details>
+<summary><b>🍎 macOS</b></summary>
 
 ```bash
 pip install -r requirements.txt pyinstaller pillow
@@ -64,9 +77,12 @@ pyinstaller --onefile --windowed --icon=icon.icns --add-data "icon.ico:." --name
 hdiutil create -volname CRT -srcfolder dist/crt.app -ov -format UDZO ../crt-macos.dmg
 ```
 
-The resulting app bundle is written to `src/dist/crt.app`, packaged as a disk image at `crt-macos.dmg`.
+Output: `src/dist/crt.app`, packaged as `crt-macos.dmg`
 
-### Linux
+</details>
+
+<details>
+<summary><b>🐧 Linux</b></summary>
 
 ```bash
 pip install -r requirements.txt pyinstaller
@@ -74,23 +90,19 @@ cd src
 pyinstaller --onefile --name crt main.py
 ```
 
-The resulting executable is written to `src/dist/crt`. The [build workflow](.github/workflows/build.yml) additionally packages this into an AppImage for distribution.
+Output: `src/dist/crt` (the [build workflow](.github/workflows/build.yml) additionally packages this as an AppImage)
 
-## Contributing
+</details>
 
-Bug reports, feature requests, and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+## 🤝 Contributing
 
-## Help Development
+Bug reports, feature requests, and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- [Translate](https://forms.gle/7R2og1FAcXDrfr7c9)
-- [Feature Request](https://forms.gle/gxr8dVEU5buHSYmN6) 
-- [Report Bugs](https://forms.gle/YniGotPDvy4Cb2v57)
+## 🙌 Credits
 
-## Credits
+- Menzo — French & Polish translation
+- Cris — Spanish translation
 
-- Menzo - French & Polish Translation
-- Cris - Spanish Translation
-
-## License
+## 📄 License
 
 CRT is licensed under the [MIT License](LICENSE).
