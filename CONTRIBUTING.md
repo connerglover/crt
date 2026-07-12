@@ -1,37 +1,55 @@
-# Contributing to this repository
+# Contributing to CRT
 
-First of all, thank you for your interest in contributing to our project!
+Thanks for your interest in contributing to Conner's Retime Tool! This document
+covers how to ask questions, report issues, and submit changes.
 
-There are several ways in which you can contribute, beyond writing code. The goal of this document is to provide a high-level overview of how you can get involved and how your contribution will be considered.
+By participating, you're expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+For how project decisions get made, see [GOVERNANCE.md](GOVERNANCE.md).
 
-## Asking Questions 
+## Asking Questions
 
-Do you have a question? Feel free to [open an issue](https://github.com/YOUR-ORGANIZATION/YOUR-PROJECT/issues/new?assignees=&labels=question&template=question.md).
-
-We will be eager to listen to you and help you out. Please, try to compose a clear and concise question. The more information you provide, the better we will be able to help you.
+Have a question about using CRT? [Open an issue](https://github.com/connerglover/crt/issues/new?labels=question&template=question.md)
+using the Question template. Please compose a clear, specific question — the
+more context you give, the faster we can help.
 
 ## Reporting Issues
 
-Do you have you identified a reproducible problem in our code? or have a feature request? We want to hear about it! Please follow the next steps:
+Found a bug, or have a feature request? We want to hear about it.
 
-### Look For an Existing Issue
+1. **Search first.** Check [open issues](https://github.com/connerglover/crt/issues)
+   to see if it's already been reported or requested. If it has, add a 👍
+   reaction and any new details in a comment rather than filing a duplicate.
+2. **File one issue per problem.** If you can't find an existing report,
+   [open a new issue](https://github.com/connerglover/crt/issues/new?template=proposal.md)
+   using the Proposal & Issue Report template. Keep bugs and feature requests
+   separate so each can be tracked on its own.
+3. **Include details.** For bugs: your OS, CRT version, steps to reproduce, and
+   what you expected vs. what happened. The more reproducible the report, the
+   faster it can be fixed.
 
-Sometimes the issue you want to report is already being addressed or is planned to be addressed soon. Before you create a new issue, please do a search in [open issues](https://github.com/connerglover/Conners-Retime-Tool/issues) to see if the issue or feature request has already been filed.
+**Security vulnerabilities are the exception** — please don't file those as a
+public issue. See [SECURITY.md](SECURITY.md) for how to report them privately.
 
-If you find your issue already exists, do not hesitate to make relevant comments and add your [reaction](https://github.com/blog/2119-add-reactions-to-pull-requests-issues-and-comments). Please, use a reaction in place of a "+1" comment, we believe it's easy: 👍 for upvoting and 👎 for downvoting.
+## Contributing Code
 
-If you cannot find an existing issue that describes your bug or feature, [create a new issue](https://github.com/connerglover/Conners-Retime-Tool/issues/new?assignees=&labels=&template=proposal.md). The template will guide you on the issue reporting.
+1. Fork the repo and create a branch for your change.
+2. Set up a dev environment — see [Running from Source](README.md#-running-from-source)
+   in the README.
+3. Make your change. CRT doesn't currently have an automated test suite or
+   enforced linter/formatter, so please:
+   - Manually run the app and exercise the feature/fix you touched before
+     opening the PR.
+   - Match the existing code style in the file(s) you're editing.
+4. Open a pull request against `main` using the PR template. Reference any
+   related issue.
+5. A maintainer will review your PR — see [GOVERNANCE.md](GOVERNANCE.md) for
+   how larger changes get discussed and decided.
 
-### Writing Good Bug Reports and Feature Requests
+For anything beyond a small fix (new features, breaking changes, UI redesigns),
+consider opening an issue first to discuss the approach before investing a lot
+of time — it saves rework on both sides.
 
-Whenever possible, we ask you to file a single issue per problem and feature request. Please do not enumerate multiple bugs or feature requests in the same issue, as it may be hard to track the progress.
+## Thank You!
 
-As you can imagine, the more information you can provide, the more likely someone will be successful at reproducing the issue and finding a fix.
-
-### Creating Pull Requests
-
-If you feel brave enough to contribute directly to the repository, you are more than welcome. Feel free to submit pull requests to this repository, which we will review according to the governance rules of the project.
-
-# Thank You!
-
-Your contributions to open source, large or small, make great projects like this possible. Thank you for taking the time to contribute.
+Your contributions to open source, large or small, make projects like this
+possible. Thanks for taking the time to contribute.

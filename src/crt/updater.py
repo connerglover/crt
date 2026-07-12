@@ -8,7 +8,7 @@ from requests import get as get_url
 # Local application
 from crt._version import __version__
 
-RELEASES_URL = "https://github.com/connerglover/Conners-Retime-Tool/releases/latest"
+RELEASES_URL = "https://github.com/connerglover/crt/releases/latest"
 
 
 def check_for_updates() -> Optional[str]:
@@ -23,7 +23,7 @@ def check_for_updates() -> Optional[str]:
     """
     try:
         response = get_url(
-            "https://api.github.com/repos/connerglover/Conners-Retime-Tool/releases/latest",
+            "https://api.github.com/repos/connerglover/crt/releases/latest",
             timeout=5
         )
         if response.status_code == 200:
