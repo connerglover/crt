@@ -537,7 +537,7 @@ class App:
                 )
 
         # Paste buttons
-        for key in ("framerate", "start", "end", "start_loads", "end_loads"):
+        for key in ("start", "end", "start_loads", "end_loads"):
             btn = win.findChild(QPushButton, f"{key}_paste")
             if btn:
                 btn.clicked.connect(lambda checked=False, k=key: self._dispatch(f"{k}_paste", {}))
@@ -617,8 +617,6 @@ class App:
                     _clipboard_set(self._youtube_chapters)
                 except Exception as e:
                     self._show_error(e)
-            case "framerate_paste":
-                self._set_framerate(_clipboard_get())
             case "start_paste":
                 self._set_time("start", _clipboard_get())
             case "end_paste":

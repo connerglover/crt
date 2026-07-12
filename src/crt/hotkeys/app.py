@@ -22,11 +22,10 @@ HOTKEY_ACTIONS = [
     ("Copy Discord Message", "Copy Discord Message", "Ctrl+Shift+D"),
     ("Copy YouTube Chapters", "Copy YouTube Chapters", "Ctrl+Shift+Y"),
     ("Clear Loads", "Clear Loads", "Ctrl+Shift+L"),
-    ("framerate_paste", "Paste Framerate", "Ctrl+1"),
-    ("start_paste", "Paste Start Frame", "Ctrl+2"),
-    ("end_paste", "Paste End Frame", "Ctrl+3"),
-    ("start_loads_paste", "Paste Start Frame (Loads)", "Ctrl+4"),
-    ("end_loads_paste", "Paste End Frame (Loads)", "Ctrl+5"),
+    ("start_paste", "Paste Start Frame", "Ctrl+1"),
+    ("end_paste", "Paste End Frame", "Ctrl+2"),
+    ("start_loads_paste", "Paste Start Frame (Loads)", "Ctrl+3"),
+    ("end_loads_paste", "Paste End Frame (Loads)", "Ctrl+4"),
     ("Add Loads", "Add Load", "Ctrl+L"),
 ]
 

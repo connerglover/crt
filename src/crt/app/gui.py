@@ -120,11 +120,11 @@ class MainWindow(QMainWindow):
     load_delete_requested = Signal(int)
     update_link_clicked = Signal()
 
-    _BASE_WIDTH = 900
+    _BASE_WIDTH = 780
     _BASE_HEIGHT = 494
     _UPDATE_BANNER_HEIGHT = 34
-    _DEFAULT_MAIN_PANEL_WIDTH = 540
-    _DEFAULT_LOADS_PANEL_WIDTH = 300
+    _DEFAULT_MAIN_PANEL_WIDTH = 460
+    _DEFAULT_LOADS_PANEL_WIDTH = 260
 
     def __init__(self, content: dict):
         super().__init__()
@@ -189,19 +189,26 @@ class MainWindow(QMainWindow):
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(1)
         outer.addWidget(self.splitter)
 
         self.main_panel = self._build_main_panel(c)
-        self.main_panel.setMinimumWidth(480)
+        self.main_panel.setMinimumWidth(420)
         self.splitter.addWidget(self.main_panel)
 
         self.loads_panel = self._build_loads_panel(c)
-        self.loads_panel.setMinimumWidth(240)
+        self.loads_panel.setMinimumWidth(200)
         self.splitter.addWidget(self.loads_panel)
 
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setSizes([self._DEFAULT_MAIN_PANEL_WIDTH, self._DEFAULT_LOADS_PANEL_WIDTH])
+
+        # Sizing is fixed — only the collapse toggle below changes it — so the
+        # handle is disabled rather than left as a functional drag-to-resize divider.
+        handle = self.splitter.handle(1)
+        handle.setEnabled(False)
+        handle.setCursor(Qt.CursorShape.ArrowCursor)
 
         self.loads_toggle_btn = QPushButton("◂")
         self.loads_toggle_btn.setObjectName("loads_toggle")
@@ -252,14 +259,14 @@ class MainWindow(QMainWindow):
         # ── Input rows ────────────────────────────────────────────────────────
         self._inputs = {}
         rows = [
-            ("framerate",   c["Framerate"],           "60"),
-            ("start",       c["Start Frame"],         "0"),
-            ("end",         c["End Frame"],            "0"),
-            ("start_loads", c["Start Frame (Loads)"], "0"),
-            ("end_loads",   c["End Frame (Loads)"],   "0"),
+            ("framerate",   c["Framerate"],           "60", False),
+            ("start",       c["Start Frame"],         "0",  True),
+            ("end",         c["End Frame"],            "0", True),
+            ("start_loads", c["Start Frame (Loads)"], "0",  True),
+            ("end_loads",   c["End Frame (Loads)"],   "0",  True),
         ]
-        for key, label_text, default in rows:
-            root.addLayout(self._make_input_row(key, label_text, default, c["Paste"]))
+        for key, label_text, default, show_paste in rows:
+            root.addLayout(self._make_input_row(key, label_text, default, c["Paste"], show_paste))
             root.addSpacing(4)
 
         root.addSpacing(6)
@@ -451,7 +458,7 @@ class MainWindow(QMainWindow):
         """
         if self._loads_collapsed:
             self._loads_collapsed = False
-            self.main_panel.setMinimumWidth(480)
+            self.main_panel.setMinimumWidth(420)
             self.main_panel.setMaximumWidth(16_777_215)  # Qt's QWIDGETSIZE_MAX
             self.loads_panel.setVisible(True)
             self.splitter.setSizes([self._main_panel_width, self._loads_panel_width])
@@ -542,7 +549,8 @@ class MainWindow(QMainWindow):
 
         return card, display
 
-    def _make_input_row(self, key: str, label_text: str, default: str, paste_label: str) -> QHBoxLayout:
+    def _make_input_row(self, key: str, label_text: str, default: str, paste_label: str,
+                        show_paste: bool = True) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(6)
 
@@ -560,13 +568,14 @@ class MainWindow(QMainWindow):
         row.addWidget(inp)
         self._inputs[key] = inp
 
-        paste_btn = QPushButton(paste_label)
-        paste_btn.setObjectName(f"{key}_paste")
-        paste_btn.setProperty("cssClass", "compact")
-        paste_btn.setFont(QFont("Segoe UI", 10))
-        paste_btn.setFixedWidth(58)
-        paste_btn.setFixedHeight(32)
-        row.addWidget(paste_btn)
+        if show_paste:
+            paste_btn = QPushButton(paste_label)
+            paste_btn.setObjectName(f"{key}_paste")
+            paste_btn.setProperty("cssClass", "compact")
+            paste_btn.setFont(QFont("Segoe UI", 10))
+            paste_btn.setFixedWidth(58)
+            paste_btn.setFixedHeight(32)
+            row.addWidget(paste_btn)
 
         return row
 
