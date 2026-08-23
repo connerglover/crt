@@ -17,7 +17,7 @@ from crt.app.gui import ClickableLabel, MainGUI
 from crt.app_settings.app import Settings
 from crt.decorators import error_handler, format_components, format_frame_time
 from crt.file_manager import FileManager
-from crt.frame_input import clean_framerate, parse_frame_input
+from crt.frame_input import clean_framerate, is_debug_info, parse_frame_input
 from crt.hotkeys import DEFAULT_HOTKEYS, HOTKEY_ACTIONS, MENU_ACTION_IDS
 from crt.popups import (
     popup_yes_no as _popup_yes_no, popup_yes_no_cancel as _popup_yes_no_cancel,
@@ -26,6 +26,7 @@ from crt.popups import (
 from crt.session_history import SessionHistory
 from crt.theme import stylesheet_for
 from crt.updater import check_for_updates, open_releases_page
+from crt.youtube_format import extract_debug_info_ids, get_format_framerate
 
 
 def _icon_path() -> str:
@@ -75,6 +76,11 @@ class App:
             'total_loads': 0,
             'avg_length': 0
         }
+
+        # (video_id, format_id) pairs the user has already been prompted about,
+        # so pasting debug info for the same video twice (start + end frame)
+        # doesn't ask about a framerate mismatch more than once per session.
+        self._framerate_prompt_seen = set()
 
         # Apply theme via stylesheet
         self._apply_theme(self.settings_dict["theme"], self.settings_dict["accent_color"])
@@ -162,7 +168,47 @@ class App:
 
     def _parse_frame(self, text: str) -> int:
         """Parses a frame input field against the current session's framerate."""
+        if is_debug_info(text):
+            self._confirm_framerate_from_debug_info(text)
         return parse_frame_input(text, self.files.time.framerate)
+
+    def _confirm_framerate_from_debug_info(self, debug_info: str) -> NoReturn:
+        """Offers to correct the session's framerate before it's used to convert
+        pasted YouTube debug info into a frame number.
+
+        debug_info_to_frame() turns the "cmt" field (a timestamp in seconds)
+        into a frame number using whatever framerate is currently set — if that
+        setting doesn't match the video, the resulting frame number is silently
+        wrong. This looks up the video's real encoded framerate (via yt-dlp,
+        keyed off the "docid"/"fmt" fields) and, if it differs from the current
+        setting by a full frame or more, asks before applying it.
+        """
+        ids = extract_debug_info_ids(debug_info)
+        if not ids or ids in self._framerate_prompt_seen:
+            return
+        video_id, format_id = ids
+
+        self._qt_app.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            detected_fps = get_format_framerate(video_id, format_id)
+        finally:
+            self._qt_app.restoreOverrideCursor()
+
+        if detected_fps is None:
+            return
+
+        current_fps = self.files.time.framerate
+        if abs(detected_fps - current_fps) < 1:
+            return
+
+        self._framerate_prompt_seen.add(ids)
+        if _popup_yes_no(
+            "Framerate Mismatch",
+            f"This video appears to be {detected_fps} FPS, but the session is set to "
+            f"{current_fps} FPS.\n\nUpdate the framerate before calculating the frame?",
+            self.window.window, self._always_on_top
+        ):
+            self._set_framerate(str(detected_fps))
 
     # ── Widget accessors ───────────────────────────────────────────────────────
 
