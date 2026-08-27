@@ -53,39 +53,15 @@ public final class ProcessRunner: @unchecked Sendable {
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
 
-        // Everything that touches `process` happens under the lock, and only
-        // once: re-launching a `Process` raises an uncatchable Objective-C
-        // exception rather than throwing, which would abort the app instead of
-        // surfacing a dialog (spec §6).
-        lock.lock()
-        if started {
-            lock.unlock()
-            throw CRTError.message("This process runner has already been used.")
-        }
-        if cancelled {
-            lock.unlock()
-            throw CRTError.message("The operation was cancelled.")
-        }
+        try launch(
+            executable: executable,
+            arguments: arguments,
+            currentDirectory: currentDirectory,
+            stdoutPipe: stdoutPipe,
+            stderrPipe: stderrPipe
+        )
 
-        process.executableURL = executable
-        process.arguments = arguments
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        process.standardInput = FileHandle.nullDevice
-        if let currentDirectory {
-            process.currentDirectoryURL = currentDirectory
-        }
-
-        do {
-            try process.run()
-            started = true
-            lock.unlock()
-        } catch {
-            lock.unlock()
-            throw CRTError.message("Could not start \(executable.lastPathComponent): \(error.localizedDescription)")
-        }
-
-        return try await withTaskCancellationHandler {
+        return await withTaskCancellationHandler {
             async let stdoutText = ProcessRunner.collect(stdoutPipe.fileHandleForReading, onLine: onStdoutLine)
             async let stderrText = ProcessRunner.collect(stderrPipe.fileHandleForReading, onLine: onStderrLine)
 
@@ -102,6 +78,53 @@ public final class ProcessRunner: @unchecked Sendable {
             return ProcessResult(status: status, stdout: stdout, stderr: stderr)
         } onCancel: {
             self.cancel()
+        }
+    }
+
+    /// Claims the runner and starts the process.
+    ///
+    /// Deliberately synchronous: taking an `NSLock` directly inside an async
+    /// function is unsupported (the thread can change across a suspension, and
+    /// it is a hard error in Swift 6), so the whole critical section lives here
+    /// where no suspension is possible.
+    ///
+    /// Everything that touches `process` happens under the lock, and only once:
+    /// re-launching a `Process` raises an uncatchable Objective-C exception
+    /// rather than throwing, which would abort the app instead of surfacing a
+    /// dialog (spec §6).
+    private func launch(
+        executable: URL,
+        arguments: [String],
+        currentDirectory: URL?,
+        stdoutPipe: Pipe,
+        stderrPipe: Pipe
+    ) throws {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if started {
+            throw CRTError.message("This process runner has already been used.")
+        }
+        if cancelled {
+            throw CRTError.message("The operation was cancelled.")
+        }
+
+        process.executableURL = executable
+        process.arguments = arguments
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        process.standardInput = FileHandle.nullDevice
+        if let currentDirectory {
+            process.currentDirectoryURL = currentDirectory
+        }
+
+        do {
+            try process.run()
+            started = true
+        } catch {
+            throw CRTError.message(
+                "Could not start \(executable.lastPathComponent): \(error.localizedDescription)"
+            )
         }
     }
 

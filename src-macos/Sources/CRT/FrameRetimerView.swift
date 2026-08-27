@@ -11,6 +11,7 @@ private enum RetimerInput: Hashable {
     case segEnd
 }
 
+@MainActor
 struct FrameRetimerView: View {
     @Environment(AppModel.self) private var model
     @FocusState private var focusedInput: RetimerInput?
@@ -259,6 +260,7 @@ struct FrameRetimerView: View {
 }
 
 /// A large click-to-copy time display card.
+@MainActor
 struct TimeCard: View {
     let title: String
     let value: String

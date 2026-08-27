@@ -1,6 +1,7 @@
 import SwiftUI
 import CRTCore
 
+@MainActor
 struct ContentView: View {
     @Environment(AppModel.self) private var model
 
@@ -156,6 +157,7 @@ struct ContentView: View {
 }
 
 /// In-app session history list (spec §6).
+@MainActor
 struct SessionHistorySheet: View {
     @Environment(AppModel.self) private var model
 

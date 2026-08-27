@@ -4,6 +4,7 @@ import CRTCore
 /// The collapsible loads/segments panel (spec §6). The header and labels
 /// switch between "Loads" and "Segments" with the session mode; rows are
 /// inline-editable cards with a duration chip and a delete button.
+@MainActor
 struct MarksSidebarView: View {
     @Environment(AppModel.self) private var model
 
@@ -77,6 +78,7 @@ struct MarksSidebarView: View {
 }
 
 /// One inline-editable load/segment card.
+@MainActor
 struct MarkRowView: View {
     @Environment(AppModel.self) private var model
 

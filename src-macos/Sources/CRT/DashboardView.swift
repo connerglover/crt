@@ -3,6 +3,7 @@ import CRTCore
 
 /// The startup Dashboard (spec §11): quick actions, run library, and the
 /// speedrun.com moderation panel.
+@MainActor
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
 

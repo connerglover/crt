@@ -5,6 +5,7 @@ import CRTCore
 
 /// The Video Retimer workspace (spec §9): import box, native player with
 /// frame stepping, timeline with marked regions, marking buttons and export.
+@MainActor
 struct VideoRetimerView: View {
     @Environment(AppModel.self) private var model
     @FocusState private var keyFocus: Bool

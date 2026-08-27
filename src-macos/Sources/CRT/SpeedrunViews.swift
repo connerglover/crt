@@ -2,6 +2,7 @@ import SwiftUI
 import CRTCore
 
 /// The speedrun.com panel on the dashboard (spec §11.2).
+@MainActor
 struct SpeedrunSection: View {
     @Environment(AppModel.self) private var model
 
@@ -253,6 +254,7 @@ struct SpeedrunSection: View {
 
 /// Reject confirmation with a required reason box (prefilled with the mod
 /// note when the run is being retimed).
+@MainActor
 struct RejectSheet: View {
     @Environment(AppModel.self) private var model
 

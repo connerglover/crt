@@ -6,6 +6,7 @@ import CRTCore
 
 /// Speedrun.com dashboard state (spec §11.2).
 @Observable
+@MainActor
 final class SpeedrunModel {
     @ObservationIgnored weak var app: AppModel?
 

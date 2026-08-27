@@ -219,14 +219,21 @@ private final class DownloadCoordinator: NSObject, URLSessionDownloadDelegate, @
         self.progress = progress
     }
 
+    /// Synchronous on purpose: taking an `NSLock` inside an async function is
+    /// unsupported (a hard error in Swift 6), so the critical section lives in
+    /// a non-async helper where no suspension can occur.
+    private func setTask(_ value: URLSessionDownloadTask?) {
+        lock.lock()
+        defer { lock.unlock() }
+        task = value
+    }
+
     func download(request: URLRequest, configuration: URLSessionConfiguration) async throws {
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
 
         let downloadTask = session.downloadTask(with: request)
-        lock.lock()
-        task = downloadTask
-        lock.unlock()
+        setTask(downloadTask)
 
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in

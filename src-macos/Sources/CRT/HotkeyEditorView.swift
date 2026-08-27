@@ -4,6 +4,7 @@ import CRTCore
 
 /// The hotkey editor (spec §10): one row per action with live capture,
 /// per-row Reset, Reset All, and duplicate detection.
+@MainActor
 struct HotkeyEditorView: View {
     /// Owns the local key monitor so it is torn down even when the settings
     /// window disappears without `onDisappear` running — a live monitor would

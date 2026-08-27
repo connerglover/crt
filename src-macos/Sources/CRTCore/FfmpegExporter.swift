@@ -68,13 +68,20 @@ public final class FfmpegExporter: @unchecked Sendable {
         active?.cancel()
     }
 
+    /// Synchronous on purpose: taking an `NSLock` inside an async function is
+    /// unsupported (a hard error in Swift 6), so the critical section lives in
+    /// a non-async helper where no suspension can occur.
+    private func setRunner(_ value: ProcessRunner?) {
+        lock.lock()
+        defer { lock.unlock() }
+        runner = value
+    }
+
     /// Runs the export. `progress` receives a fraction in [0, 1].
     public func export(job: ExportJob, ffmpeg: URL,
                        progress: @escaping @Sendable (Double) -> Void) async throws {
         let newRunner = ProcessRunner()
-        lock.lock()
-        runner = newRunner
-        lock.unlock()
+        setRunner(newRunner)
 
         let totalSeconds = NSDecimalNumber(decimal: job.trimEnd - job.trimStart).doubleValue
 
@@ -89,9 +96,7 @@ public final class FfmpegExporter: @unchecked Sendable {
             }
         )
 
-        lock.lock()
-        runner = nil
-        lock.unlock()
+        setRunner(nil)
 
         if newRunner.isCancelled {
             try? FileManager.default.removeItem(at: job.output)

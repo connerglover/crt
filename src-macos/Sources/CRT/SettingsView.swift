@@ -4,6 +4,7 @@ import CRTCore
 
 /// The Settings scene (spec §4, §12): Apply / Cancel / Restore Defaults
 /// semantics as in the Python app, plus the native-only video keys.
+@MainActor
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss

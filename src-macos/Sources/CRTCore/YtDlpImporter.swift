@@ -59,6 +59,36 @@ public struct YtDlpImporter: Sendable {
         return nil
     }
 
+    /// Reads the top-level `fps` out of `yt-dlp -j` output.
+    ///
+    /// Spec §9.1 uses this as the framerate source when ffprobe is unavailable.
+    /// yt-dlp reports fps as a JSON number (30, 59.94, …); it is read through
+    /// its string form so the value lands in `Decimal` exactly rather than via
+    /// a binary `Double`, which is the whole reason CRT times in decimal.
+    /// Returns nil when the field is absent or unparseable.
+    public static func parseTopLevelFps(_ data: Data) -> Decimal? {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let root = object as? [String: Any],
+            let raw = root["fps"]
+        else {
+            return nil
+        }
+
+        let text: String
+        switch raw {
+        case let number as NSNumber:
+            text = number.stringValue
+        case let string as String:
+            text = string
+        default:
+            return nil
+        }
+
+        guard let value = Decimal(string: text), value > 0 else { return nil }
+        return value
+    }
+
     /// The download command from spec §9.1 (`--newline` added so progress is
     /// emitted line-by-line).
     public static func downloadArguments(url: String, cacheDir: URL) -> [String] {

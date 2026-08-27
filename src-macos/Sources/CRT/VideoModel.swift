@@ -8,6 +8,7 @@ import CRTCore
 /// State for the Video Retimer workspace (spec §9). The video retimer and
 /// the frame retimer are two views over the same `TimeSession` in AppModel.
 @Observable
+@MainActor
 final class VideoModel {
     @ObservationIgnored weak var app: AppModel?
 
@@ -118,19 +119,22 @@ final class VideoModel {
             let ready = observed.status == .readyToPlay
             let failed = observed.status == .failed
             let failureMessage = observed.error?.localizedDescription
+            // Bind the weak reference to a local *before* the Task: `self` here
+            // is the observation closure's captured variable, and referencing a
+            // captured var from concurrently-executing code is an error.
+            guard let model = self else { return }
             Task { @MainActor in
-                guard let self else { return }
                 if ready {
-                    let name = self.videoFile?.lastPathComponent ?? ""
-                    self.app?.toast(self.loc("Video loaded {file}", "Video loaded: {file}")
+                    let name = model.videoFile?.lastPathComponent ?? ""
+                    model.app?.toast(model.loc("Video loaded {file}", "Video loaded: {file}")
                         .replacingOccurrences(of: "{file}", with: name))
                 } else if failed {
-                    self.hasVideo = false
-                    let base = self.loc(
+                    model.hasVideo = false
+                    let base = model.loc(
                         "Video Unplayable",
                         "The video could not be opened. Its format may not be playable on this Mac."
                     )
-                    self.app?.showErrorMessage(
+                    model.app?.showErrorMessage(
                         failureMessage.map { base + "\n\n" + $0 } ?? base
                     )
                 }
@@ -190,12 +194,15 @@ final class VideoModel {
         }
         let interval = CMTime(value: 1, timescale: 60)
         timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            // Same reason as observeStatus: bind before hopping to the actor, so
+            // the Task captures an immutable local rather than the closure's
+            // captured `self` variable.
+            guard let model = self else { return }
             Task { @MainActor in
-                guard let self else { return }
                 if time.seconds.isFinite {
-                    self.currentSeconds = time.seconds
+                    model.currentSeconds = time.seconds
                 }
-                self.isPlaying = self.player.rate != 0
+                model.isPlaying = model.player.rate != 0
             }
         }
     }

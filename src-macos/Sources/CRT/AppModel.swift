@@ -21,6 +21,7 @@ enum FrameField {
 /// Root application model. State mutations happen on the main actor (all
 /// entry points are UI-driven); AppKit-touching methods are marked @MainActor.
 @Observable
+@MainActor
 final class AppModel {
     static let shared = AppModel()
 
