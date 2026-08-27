@@ -1,0 +1,64 @@
+<Window
+    x:Class="CRT.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <InfoBar
+            x:Name="UpdateBanner"
+            Grid.Row="0"
+            IsOpen="False"
+            Severity="Informational"
+            IsClosable="True" />
+
+        <NavigationView
+            x:Name="Nav"
+            Grid.Row="1"
+            PaneDisplayMode="Left"
+            OpenPaneLength="200"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="True"
+            SelectionChanged="OnNavSelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="NavDashboard" Tag="dashboard">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Home" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavRetimer" Tag="retimer">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Clock" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavVideo" Tag="video">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Video" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <Grid>
+                <Frame x:Name="ContentFrame" />
+                <ProgressBar
+                    x:Name="BusyBar"
+                    VerticalAlignment="Top"
+                    IsIndeterminate="True"
+                    Visibility="Collapsed" />
+            </Grid>
+        </NavigationView>
+
+        <InfoBar
+            x:Name="ToastBar"
+            Grid.Row="1"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,20"
+            IsClosable="False"
+            IsOpen="False"
+            Severity="Success" />
+    </Grid>
+</Window>

@@ -1,0 +1,176 @@
+<Page
+    x:Class="CRT.Views.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:CRT.ViewModels"
+    NavigationCacheMode="Required">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="18" Padding="20,12,20,24" MaxWidth="1100" HorizontalAlignment="Stretch">
+
+            <!-- Quick actions -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button x:Name="NewRetimeButton" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind VM.NewRetimeCommand}" />
+                <Button x:Name="OpenFileButton" Command="{x:Bind VM.OpenFileCommand}" />
+                <Button x:Name="ImportVideoButton" Command="{x:Bind VM.ImportVideoCommand}" />
+                <Button
+                    x:Name="UnsavedTile"
+                    Command="{x:Bind VM.ContinueEditingCommand}"
+                    Visibility="{x:Bind VM.HasUnsavedSession, Mode=OneWay}"
+                    Content="{x:Bind VM.UnsavedSessionText, Mode=OneWay}" />
+            </StackPanel>
+
+            <!-- Run library -->
+            <StackPanel Spacing="8">
+                <TextBlock x:Name="LibraryHeader" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock
+                    x:Name="LibraryEmptyText"
+                    Opacity="0.6"
+                    Visibility="{x:Bind Invert(VM.HasLibraryEntries), Mode=OneWay}" />
+                <ItemsControl ItemsSource="{x:Bind VM.LibraryEntries, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LibraryEntryViewModel">
+                            <Border Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,0,8">
+                                <Grid ColumnSpacing="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Bind Title}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock FontSize="12" Opacity="0.7" Text="{x:Bind Game}" />
+                                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                <TextBlock FontSize="11" Text="{x:Bind ModeChip}" />
+                                            </Border>
+                                            <TextBlock FontSize="12" Opacity="0.5" Text="{x:Bind ModifiedText}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">
+                                        <TextBlock FontFamily="Consolas" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Right" Text="{x:Bind PrimaryTime}" />
+                                        <TextBlock FontFamily="Consolas" FontSize="12" Opacity="0.6" HorizontalAlignment="Right" Text="{x:Bind SecondaryTime}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button Content="{x:Bind OpenLabel}" Command="{x:Bind OpenCommand}" />
+                                        <Button Content="…">
+                                            <Button.Flyout>
+                                                <MenuFlyout>
+                                                    <MenuFlyoutItem Text="{x:Bind RevealLabel}" Command="{x:Bind RevealCommand}" />
+                                                    <MenuFlyoutItem Text="{x:Bind CopyModNoteLabel}" Command="{x:Bind CopyModNoteCommand}" />
+                                                    <MenuFlyoutItem Text="{x:Bind RemoveLabel}" Command="{x:Bind RemoveCommand}" />
+                                                </MenuFlyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Speedrun.com -->
+            <StackPanel Spacing="8">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="SrcHeader" Grid.Column="0" FontSize="18" FontWeight="SemiBold" />
+                    <ProgressRing Grid.Column="1" Width="18" Height="18" IsActive="{x:Bind VM.IsLoading, Mode=OneWay}" />
+                    <Button x:Name="RefreshButton" Grid.Column="2" Command="{x:Bind VM.RefreshCommand}" Visibility="{x:Bind VM.IsSignedIn, Mode=OneWay}" />
+                </Grid>
+
+                <InfoBar
+                    Severity="Error"
+                    IsClosable="False"
+                    IsOpen="{x:Bind VM.HasError, Mode=OneWay}"
+                    Message="{x:Bind VM.ErrorText, Mode=OneWay}" />
+
+                <!-- Signed out -->
+                <Border Style="{StaticResource CardBorderStyle}" Padding="16,12" Visibility="{x:Bind Invert(VM.IsSignedIn), Mode=OneWay}">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Name="SignInExplainer" TextWrapping="Wrap" Opacity="0.8" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <PasswordBox
+                                x:Name="ApiKeyBox"
+                                Grid.Column="0"
+                                PasswordChanged="OnApiKeyChanged" />
+                            <Button x:Name="SignInButton" Grid.Column="1" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind VM.SignInCommand}" />
+                            <HyperlinkButton x:Name="GetKeyLink" Grid.Column="2" Click="OnGetKeyClick" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Signed in -->
+                <StackPanel Spacing="10" Visibility="{x:Bind VM.IsSignedIn, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <PersonPicture Width="32" Height="32" ProfilePicture="{x:Bind AvatarSource(VM.AvatarUri), Mode=OneWay}" DisplayName="{x:Bind VM.UserName, Mode=OneWay}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Bind SignedInText(VM.UserName), Mode=OneWay}" />
+                        <Button x:Name="SignOutButton" Command="{x:Bind VM.SignOutCommand}" />
+                    </StackPanel>
+
+                    <TextBlock FontWeight="SemiBold" Text="{x:Bind VM.PendingHeader, Mode=OneWay}" />
+                    <TextBlock x:Name="NoPendingText" Opacity="0.6" Visibility="{x:Bind Invert(VM.HasPendingRuns), Mode=OneWay}" />
+                    <ItemsControl ItemsSource="{x:Bind VM.PendingRuns, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PendingRunViewModel">
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock FontWeight="SemiBold" Text="{x:Bind GameName}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock FontSize="12" Opacity="0.7" Text="{x:Bind CategoryText}" />
+                                                <TextBlock FontSize="12" Opacity="0.7" Text="{x:Bind Players}" />
+                                                <TextBlock FontSize="12" Opacity="0.5" Text="{x:Bind SubmittedText}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" FontFamily="Consolas" FontSize="18" VerticalAlignment="Center" Text="{x:Bind ClaimedTime}" />
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Content="{x:Bind WatchLabel}" Command="{x:Bind WatchCommand}" IsEnabled="{x:Bind HasVideo}" />
+                                            <Button Content="{x:Bind RetimeLabel}" Command="{x:Bind RetimeCommand}" />
+                                            <Button Content="{x:Bind VerifyLabel}" Command="{x:Bind VerifyCommand}" />
+                                            <Button Content="{x:Bind RejectLabel}" Command="{x:Bind RejectCommand}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="RecentRunsHeader" FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{x:Bind VM.RecentRuns, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RecentRunViewModel">
+                                <Grid ColumnSpacing="10" Padding="4,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Width="18" Text="{x:Bind StatusGlyph}" />
+                                    <TextBlock Grid.Column="1" TextTrimming="CharacterEllipsis" Text="{x:Bind GameAndCategory}" />
+                                    <TextBlock Grid.Column="2" FontFamily="Consolas" Text="{x:Bind Time}" />
+                                    <TextBlock Grid.Column="3" Opacity="0.5" FontSize="12" Text="{x:Bind DateText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

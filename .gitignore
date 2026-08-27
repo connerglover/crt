@@ -212,3 +212,23 @@ ENV/
 /site
 
 # End of https://www.gitignore.io/api/macos,linux,django,python,pycharm
+
+### .NET / WinUI 3 (src-windows) ###
+# Build output — ~675 MB of it, since the app is self-contained and bundles
+# the Windows App SDK runtime. Never commit these.
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.binlog
+msbuild.log
+
+### Swift / SwiftPM (src-macos) ###
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+# make-app.sh output (also covered by the Python "build/" rule above)
+src-macos/build/

@@ -1,0 +1,38 @@
+<Application
+    x:Class="CRT.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Shared styles -->
+            <Style x:Key="TimeCardValueStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Consolas" />
+                <Setter Property="FontSize" Value="38" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+            </Style>
+            <Style x:Key="TimeCardLabelStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Opacity" Value="0.6" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+            </Style>
+            <!-- WinUI ships no accent SplitButton style; §6 wants Copy Mod Note primary. -->
+            <Style x:Key="AccentSplitButtonStyle" TargetType="SplitButton">
+                <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+            </Style>
+            <Style x:Key="CardBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

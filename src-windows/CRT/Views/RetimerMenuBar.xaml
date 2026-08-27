@@ -1,0 +1,37 @@
+<UserControl
+    x:Class="CRT.Views.RetimerMenuBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <MenuBar x:Name="MainMenuBar">
+        <MenuBarItem x:Name="FileMenu">
+            <MenuFlyoutItem x:Name="MenuNewTime" Click="OnMenuNewTime" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="MenuOpenTime" Click="OnMenuOpenTime" />
+            <MenuFlyoutItem x:Name="MenuSessionHistory" Click="OnMenuSessionHistory" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="MenuSave" Click="OnMenuSave" />
+            <MenuFlyoutItem x:Name="MenuSaveAs" Click="OnMenuSaveAs" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="MenuSettings" Click="OnMenuSettings" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="MenuExit" Click="OnMenuExit" />
+        </MenuBarItem>
+        <MenuBarItem x:Name="EditMenu">
+            <MenuFlyoutItem x:Name="MenuUndo" Click="OnMenuUndo" />
+            <MenuFlyoutItem x:Name="MenuRedo" Click="OnMenuRedo" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="MenuCopyModNote" Click="OnMenuCopyModNote" />
+            <MenuFlyoutItem x:Name="MenuCopyDiscord" Click="OnMenuCopyDiscord" />
+            <MenuFlyoutItem x:Name="MenuCopyChapters" Click="OnMenuCopyChapters" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="MenuClearLoads" Click="OnMenuClearLoads" />
+        </MenuBarItem>
+        <MenuBarItem x:Name="ViewMenu">
+            <ToggleMenuFlyoutItem x:Name="MenuAlwaysOnTop" Click="OnMenuAlwaysOnTop" />
+        </MenuBarItem>
+        <MenuBarItem x:Name="HelpMenu">
+            <MenuFlyoutItem x:Name="MenuAbout" Click="OnMenuAbout" />
+        </MenuBarItem>
+    </MenuBar>
+</UserControl>
