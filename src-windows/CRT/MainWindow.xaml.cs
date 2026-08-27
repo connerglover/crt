@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using CRT.Services;
 using CRT.Views;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -19,20 +20,37 @@ public sealed partial class MainWindow : Window
     private DispatcherQueueTimer? _toastTimer;
     private bool _closeConfirmed;
     private bool _alwaysOnTop;
+    private bool _backdropActive;
 
     public MainWindow()
     {
         InitializeComponent();
 
         Title = "Conner's Retime Tool";
-        SystemBackdrop = new MicaBackdrop();
+        // The nav surfaces are transparent so the backdrop can show through, so
+        // a window with no backdrop renders pure black. Mica needs Windows 11
+        // and the system "transparency effects" setting, so where it is
+        // unavailable ApplyTheme paints an opaque base instead.
+        _backdropActive = MicaController.IsSupported();
+        if (_backdropActive)
+        {
+            SystemBackdrop = new MicaBackdrop();
+        }
+
+        // The title bar has to be part of the content to be themed at all: the
+        // system-drawn one follows the OS theme, not the app's, so it stayed
+        // light no matter what the in-app theme was set to. Extending also lets
+        // the Mica backdrop reach the caption area.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        TitleBarText.Text = Title;
 
         // Localized nav labels.
         NavDashboard.Content = AppServices.Loc["Dashboard"];
         NavRetimer.Content = AppServices.Loc["Frame Retimer"];
         NavVideo.Content = AppServices.Loc["Video Retimer"];
 
-        RootGrid.RequestedTheme = ThemeService.ResolveTheme(AppServices.Settings.Theme);
+        ApplyTheme(AppServices.Settings.Theme);
         RootGrid.Loaded += (_, _) => AppServices.Dialogs.Root = RootGrid.XamlRoot;
 
         ConfigureAppWindow();
@@ -49,14 +67,84 @@ public sealed partial class MainWindow : Window
 
     public bool AlwaysOnTop => _alwaysOnTop;
 
+    // Logical (DPI-independent) startup size. The Python window is a fixed
+    // 780×494 with the loads panel open; this shell adds a navigation rail and
+    // a menu bar, so it needs a little more, but the previous 1180×760 was
+    // roughly twice the area of the original for no reason.
+    private const int DefaultLogicalWidth = 940;
+    private const int DefaultLogicalHeight = 600;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
     private void ConfigureAppWindow()
     {
         string iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
         if (File.Exists(iconPath))
         {
             AppWindow.SetIcon(iconPath);
+            TitleBarIcon.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(iconPath));
         }
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1180, 760));
+
+        // AppWindow.Resize takes physical pixels, so a fixed number shrinks in
+        // apparent size as display scaling rises. Qt sized in logical units, so
+        // scale to match what the original actually looked like.
+        double scale = Scale();
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(
+            (int)(DefaultLogicalWidth * scale),
+            (int)(DefaultLogicalHeight * scale)));
+    }
+
+    private double Scale()
+    {
+        IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        uint dpi = GetDpiForWindow(handle);
+        return dpi == 0 ? 1.0 : dpi / 96.0;
+    }
+
+    // ── Theme ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Applies a stored theme name to the content and the caption buttons.
+    /// Public so the settings page can re-apply it without a restart.
+    /// </summary>
+    public void ApplyTheme(string themeName)
+    {
+        ElementTheme theme = ThemeService.ResolveTheme(themeName);
+        RootGrid.RequestedTheme = theme;
+
+        // Caption buttons are drawn by the system and are not part of the XAML
+        // tree, so they do not inherit RootGrid's theme and have to be colored
+        // by hand. Transparent backgrounds keep Mica visible behind them.
+        var titleBar = AppWindow.TitleBar;
+        titleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+
+        bool dark = theme switch
+        {
+            ElementTheme.Dark => true,
+            ElementTheme.Light => false,
+            _ => Application.Current.RequestedTheme == ApplicationTheme.Dark,
+        };
+        // Without a backdrop the transparent nav surfaces have nothing behind
+        // them, so supply the base color the backdrop would otherwise provide.
+        RootGrid.Background = _backdropActive
+            ? null
+            : new SolidColorBrush(dark
+                ? Windows.UI.Color.FromArgb(255, 32, 32, 32)
+                : Windows.UI.Color.FromArgb(255, 243, 243, 243));
+
+        Windows.UI.Color foreground = dark ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black;
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedForegroundColor = foreground;
+        titleBar.ButtonInactiveForegroundColor = dark ? Microsoft.UI.Colors.Gray : Microsoft.UI.Colors.DimGray;
+        titleBar.ButtonHoverBackgroundColor = dark
+            ? Windows.UI.Color.FromArgb(24, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(16, 0, 0, 0);
+        titleBar.ButtonPressedBackgroundColor = dark
+            ? Windows.UI.Color.FromArgb(40, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(28, 0, 0, 0);
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 using CRT.Core.Files;
 using CRT.Core.Localization;
 using CRT.Core.Models;
+using CRT.Core.Net;
 using CRT.Core.Tools;
 using Xunit;
 
@@ -262,5 +263,44 @@ public class FfprobeClientTests
         Assert.Equal(
             decimal.Parse(expected, System.Globalization.CultureInfo.InvariantCulture),
             FfprobeClient.EvaluateRational(rational));
+    }
+}
+
+public class UpdateCheckerVersionTests
+{
+    // The rewrite is 2.0.0 while the newest published tag is the Python app's
+    // 1.2.2, so a plain string comparison advertised a downgrade every launch.
+    [Fact]
+    public void OlderPublishedTagIsNotAnUpdate()
+    {
+        Assert.False(UpdateChecker.IsNewer("1.2.2", "2.0.0"));
+        Assert.False(UpdateChecker.IsNewer("v1.2.2", "2.0.0"));
+    }
+
+    [Theory]
+    [InlineData("2.0.1", "2.0.0")]
+    [InlineData("v2.1.0", "2.0.0")]
+    [InlineData("3.0.0", "2.0.0")]
+    [InlineData("2.1.0-beta1", "2.0.0")]
+    public void NewerTagIsAnUpdate(string latest, string current)
+    {
+        Assert.True(UpdateChecker.IsNewer(latest, current));
+    }
+
+    [Theory]
+    [InlineData("2.0.0", "2.0.0")]
+    [InlineData("v2.0.0", "2.0.0")]
+    public void SameVersionIsNotAnUpdate(string latest, string current)
+    {
+        Assert.False(UpdateChecker.IsNewer(latest, current));
+    }
+
+    [Theory]
+    [InlineData("nightly")]
+    [InlineData("")]
+    [InlineData("release")]
+    public void UnparseableTagStaysQuiet(string latest)
+    {
+        Assert.False(UpdateChecker.IsNewer(latest, "2.0.0"));
     }
 }

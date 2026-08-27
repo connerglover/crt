@@ -54,6 +54,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Button
+                            x:Name="PrimaryCard"
                             Grid.Column="0"
                             HorizontalAlignment="Stretch"
                             Padding="0,14"
@@ -64,6 +65,7 @@
                             </StackPanel>
                         </Button>
                         <Button
+                            x:Name="SecondaryCard"
                             Grid.Column="1"
                             HorizontalAlignment="Stretch"
                             Padding="0,14"

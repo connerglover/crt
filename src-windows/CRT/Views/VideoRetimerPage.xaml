@@ -101,7 +101,6 @@
             <Button x:Name="MarkEndButton" Command="{x:Bind VM.MarkEndCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
             <Button x:Name="MarkLoadStartButton" Command="{x:Bind VM.MarkLoadStartCommand}" Visibility="{x:Bind Invert(SessionVM.IsSegmentMode), Mode=OneWay}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
             <Button x:Name="MarkLoadEndButton" Command="{x:Bind VM.MarkLoadEndCommand}" Visibility="{x:Bind Invert(SessionVM.IsSegmentMode), Mode=OneWay}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
-            <Button x:Name="ExportButton" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind VM.ExportCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
         </StackPanel>
 
         <!-- Right: live time displays + shared marks sidebar -->
@@ -123,6 +122,18 @@
                         <TextBlock FontFamily="Consolas" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Text="{x:Bind SessionVM.SecondaryTimeText, Mode=OneWay}" />
                     </StackPanel>
                 </Border>
+                <!--
+                    Export lives here rather than at the end of the mark-button
+                    row: five buttons on one line overflowed the content column
+                    and clipped this one, and it is a primary action that should
+                    not depend on the window being wide enough to see.
+                -->
+                <Button
+                    x:Name="ExportButton"
+                    HorizontalAlignment="Stretch"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Command="{x:Bind VM.ExportCommand}"
+                    IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
                 <TextBlock x:Name="VideoStatusText" Opacity="0.7" FontSize="12" TextWrapping="Wrap" Text="{x:Bind VM.StatusText, Mode=OneWay}" />
             </StackPanel>
             <views:SessionSidebar Grid.Row="1" />

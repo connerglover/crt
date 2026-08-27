@@ -4,22 +4,63 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid x:Name="RootGrid">
+        <Grid.Resources>
+            <!--
+                NavigationView paints opaque layer brushes across the pane and
+                the content area, which covered the Mica backdrop completely.
+                Clearing them lets the backdrop show through; the card styles in
+                App.xaml still supply the layered surfaces on top of it.
+            -->
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+        </Grid.Resources>
+
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!--
+            Drag region for the extended title bar. Content reaches into the
+            caption area so the title bar picks up both the app theme and the
+            Mica backdrop; the right inset is reserved at runtime for the system
+            caption buttons.
+        -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Image
+                x:Name="TitleBarIcon"
+                Grid.Column="0"
+                Width="16"
+                Height="16"
+                Margin="12,0,0,0"
+                VerticalAlignment="Center" />
+            <TextBlock
+                x:Name="TitleBarText"
+                Grid.Column="1"
+                Margin="10,0,0,0"
+                VerticalAlignment="Center"
+                Style="{StaticResource CaptionTextBlockStyle}" />
+        </Grid>
+
         <InfoBar
             x:Name="UpdateBanner"
-            Grid.Row="0"
+            Grid.Row="1"
             IsOpen="False"
             Severity="Informational"
             IsClosable="True" />
 
         <NavigationView
             x:Name="Nav"
-            Grid.Row="1"
-            PaneDisplayMode="Left"
+            Grid.Row="2"
+            Background="Transparent"
+            PaneDisplayMode="LeftCompact"
             OpenPaneLength="200"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="True"
@@ -53,7 +94,7 @@
 
         <InfoBar
             x:Name="ToastBar"
-            Grid.Row="1"
+            Grid.Row="2"
             HorizontalAlignment="Center"
             VerticalAlignment="Bottom"
             Margin="0,0,0,20"

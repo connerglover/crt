@@ -18,6 +18,7 @@ namespace CRT.Views;
 public sealed partial class VideoRetimerPage : Page
 {
     private DispatcherQueueTimer? _positionTimer;
+    private PageHotkeys _hotkeys = null!;
     private bool _suppressSliderEvent;
     private bool _sliderDragging;
 
@@ -72,15 +73,9 @@ public sealed partial class VideoRetimerPage : Page
     private void BuildAccelerators()
     {
         var hotkeys = AppServices.Settings.Hotkeys;
+        _hotkeys = new PageHotkeys(this);
 
-        void Add(string actionId, Action action)
-        {
-            if (hotkeys.TryGetValue(actionId, out string? gesture) &&
-                KeyGesture.CreateAccelerator(gesture, action) is { } accelerator)
-            {
-                KeyboardAccelerators.Add(accelerator);
-            }
-        }
+        void Add(string actionId, Action action) => _hotkeys.Bind(hotkeys, actionId, action);
 
         // Video-mode actions (spec §9.2/§10).
         Add("video_frame_back", VM.StepBackward);
@@ -107,13 +102,7 @@ public sealed partial class VideoRetimerPage : Page
         Add("Save", () => _ = SessionVM.SaveAsync());
         Add("Copy Mod Note", () => _ = SessionVM.CopyModNoteAsync());
 
-        void AddFixed(string gesture, Action action)
-        {
-            if (KeyGesture.CreateAccelerator(gesture, action) is { } accelerator)
-            {
-                KeyboardAccelerators.Add(accelerator);
-            }
-        }
+        void AddFixed(string gesture, Action action) => _hotkeys.Bind(gesture, action);
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────

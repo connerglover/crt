@@ -92,6 +92,38 @@ public class FrameInputParserTests
         Assert.False(FrameInputParser.IsDebugInfo("plain 123"));
         Assert.False(FrameInputParser.IsDebugInfo("cmt without braces"));
     }
+
+    // An entry past int.MaxValue used to read back as frame 0, because
+    // int.TryParse simply failed and the parser fell through to its
+    // "unparseable" return. Zero is indistinguishable from a real frame, so the
+    // value now saturates instead.
+    [Theory]
+    [InlineData("2147483647", 2147483647)]   // int.MaxValue itself still exact
+    [InlineData("2147483648", 2147483647)]   // one past — used to be 0
+    [InlineData("3000000000", 2147483647)]
+    [InlineData("99999999999999999999999999999999", 2147483647)]  // beyond decimal too
+    public void ParseFrameInput_HugeIntegerSaturates(string text, int expected)
+    {
+        Assert.Equal(expected, FrameInputParser.ParseFrameInput(text, 60m));
+    }
+
+    // The seconds path multiplied and cast unchecked, so it wrapped rather than
+    // failing — which could even yield a negative frame.
+    [Fact]
+    public void ParseFrameInput_HugeSecondsSaturates()
+    {
+        Assert.Equal(int.MaxValue, FrameInputParser.ParseFrameInput("99999999.5", 60m));
+        Assert.Equal(int.MaxValue, FrameInputParser.ParseFrameInput("7000000000000000000000000000.0", 60m));
+    }
+
+    [Fact]
+    public void ParseFrameInput_NormalValuesUnaffected()
+    {
+        Assert.Equal(0, FrameInputParser.ParseFrameInput("", 60m));
+        Assert.Equal(0, FrameInputParser.ParseFrameInput("abc", 60m));
+        Assert.Equal(1234, FrameInputParser.ParseFrameInput("1234", 60m));
+        Assert.Equal(90, FrameInputParser.ParseFrameInput("1.5", 60m));
+    }
 }
 
 public class DebugInfoTests

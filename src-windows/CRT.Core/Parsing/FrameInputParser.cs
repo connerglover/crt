@@ -50,7 +50,7 @@ public static partial class FrameInputParser
             throw new ValidationException(InvalidDebugInfoMessage);
         }
 
-        return (int)Math.Round(cmt * framerate, 0, MidpointRounding.ToEven);
+        return SecondsToFrame(cmt, framerate);
     }
 
     /// <summary>
@@ -112,14 +112,53 @@ public static partial class FrameInputParser
             {
                 return 0;
             }
-            return (int)Math.Round(seconds * framerate, 0, MidpointRounding.ToEven);
+            return SecondsToFrame(seconds, framerate);
         }
 
-        if (int.TryParse(cleaned, NumberStyles.Integer, CultureInfo.InvariantCulture, out int frame))
+        if (decimal.TryParse(cleaned, NumberStyles.Integer, CultureInfo.InvariantCulture, out decimal whole))
         {
-            return frame;
+            return ToFrame(whole);
         }
-        return 0;
+        // Too many digits for decimal itself (~29). Still a run of digits, so it
+        // is an enormous number rather than junk — saturate instead of reading 0.
+        return int.MaxValue;
+    }
+
+    /// <summary>
+    /// Converts a frame count to <see cref="int"/>, saturating rather than
+    /// overflowing.
+    /// </summary>
+    /// <remarks>
+    /// Both failure modes this replaces produced a wrong number that looked
+    /// legitimate: <c>int.TryParse</c> rejects anything above 2147483647 and the
+    /// caller fell through to 0, so a large paste silently read as frame zero;
+    /// and an unchecked <c>(int)</c> cast of seconds × framerate wraps, which can
+    /// even land on a negative frame. Clamping keeps an out-of-range entry
+    /// visibly huge instead.
+    /// </remarks>
+    private static int ToFrame(decimal value) => value switch
+    {
+        >= int.MaxValue => int.MaxValue,
+        <= int.MinValue => int.MinValue,
+        _ => (int)value,
+    };
+
+    /// <summary>
+    /// Frames for <paramref name="seconds"/> at <paramref name="framerate"/>,
+    /// saturating on overflow. The multiplication itself can exceed decimal's
+    /// range for a long enough entry, and that throws rather than wrapping — so
+    /// it has to be caught here instead of only clamping the result.
+    /// </summary>
+    private static int SecondsToFrame(decimal seconds, decimal framerate)
+    {
+        try
+        {
+            return ToFrame(Math.Round(seconds * framerate, 0, MidpointRounding.ToEven));
+        }
+        catch (OverflowException)
+        {
+            return seconds < 0m ? int.MinValue : int.MaxValue;
+        }
     }
 
     /// <summary>Collapses multiple decimal points, keeping only the first.</summary>

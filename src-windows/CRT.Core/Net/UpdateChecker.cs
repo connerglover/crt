@@ -35,7 +35,7 @@ public sealed class UpdateChecker
             }
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
             string? latest = document.RootElement.GetProperty("tag_name").GetString();
-            if (!string.IsNullOrEmpty(latest) && latest != AppVersion.Version)
+            if (!string.IsNullOrEmpty(latest) && IsNewer(latest, AppVersion.Version))
             {
                 return latest;
             }
@@ -45,5 +45,39 @@ public sealed class UpdateChecker
             // Silent by design.
         }
         return null;
+    }
+
+    /// <summary>
+    /// True when <paramref name="latestTag"/> is a strictly newer release than
+    /// <paramref name="current"/>.
+    /// </summary>
+    /// <remarks>
+    /// This used to be <c>latest != current</c>. Plain inequality was harmless
+    /// while the app version tracked the published releases, but the native
+    /// rewrite is 2.0.0 and the newest published tag is 1.2.2 — so every launch
+    /// advertised an "update" that is actually a downgrade to the Python build.
+    /// Unparseable tags return false: nagging on a tag we cannot understand is
+    /// worse than staying quiet.
+    /// </remarks>
+    public static bool IsNewer(string latestTag, string current) =>
+        TryParseVersion(latestTag, out Version? latest) &&
+        TryParseVersion(current, out Version? running) &&
+        latest > running;
+
+    private static bool TryParseVersion(string text, out Version? version)
+    {
+        version = null;
+        string trimmed = text.Trim().TrimStart('v', 'V');
+
+        // Keep only the leading dotted-numeric run so pre-release suffixes
+        // ("2.1.0-beta1", "1.2.2+build") still compare on their numeric part.
+        int end = 0;
+        while (end < trimmed.Length && (char.IsAsciiDigit(trimmed[end]) || trimmed[end] == '.'))
+        {
+            end++;
+        }
+        trimmed = trimmed[..end].TrimEnd('.');
+
+        return trimmed.Contains('.') && Version.TryParse(trimmed, out version);
     }
 }

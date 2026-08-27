@@ -185,10 +185,27 @@ public static class KeyGesture
         return key.ToString();
     }
 
-    /// <summary>Builds a KeyboardAccelerator for a gesture string, or null when unparseable.</summary>
+    /// <summary>
+    /// True when <paramref name="key"/> may be given to a
+    /// <see cref="KeyboardAccelerator"/>.
+    /// </summary>
+    /// <remarks>
+    /// The OEM keys above (<c>,</c> <c>.</c> <c>[</c> …) are real virtual-key
+    /// codes but are not members of <see cref="VirtualKey"/>, and an accelerator
+    /// holding one crashes the XAML core natively when its element is attached
+    /// to the visual tree. Such gestures must go through <see cref="PageHotkeys"/>,
+    /// which dispatches them from a KeyDown handler instead.
+    /// </remarks>
+    public static bool IsAcceleratorSafe(VirtualKey key) => Enum.IsDefined(key);
+
+    /// <summary>
+    /// Builds a KeyboardAccelerator for a gesture string, or null when
+    /// unparseable or when the key cannot safely be used as an accelerator.
+    /// </summary>
     public static KeyboardAccelerator? CreateAccelerator(string gesture, Action action, bool allowWhenTyping = false)
     {
-        if (!TryParse(gesture, out VirtualKeyModifiers modifiers, out VirtualKey key))
+        if (!TryParse(gesture, out VirtualKeyModifiers modifiers, out VirtualKey key) ||
+            !IsAcceleratorSafe(key))
         {
             return null;
         }

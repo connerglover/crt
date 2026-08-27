@@ -131,6 +131,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         AppServices.ReloadSettings();
         _edited = AppServices.Settings.Clone();
 
+        // Theme is cheap to re-apply, so it takes effect immediately rather than
+        // waiting for the restart the remaining settings still need.
+        AppServices.MainWindow?.ApplyTheme(newSettings.Theme);
+
         if (!newSettings.ContentEquals(oldSettings))
         {
             await AppServices.Dialogs.ShowInfoAsync(

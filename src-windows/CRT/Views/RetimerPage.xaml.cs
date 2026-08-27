@@ -19,6 +19,7 @@ public sealed partial class RetimerPage : Page
         { "24", "25", "29.97", "30", "50", "59.94", "60" };
 
     private bool _suppressModeEvent;
+    private PageHotkeys _hotkeys = null!;
 
     public RetimerPage()
     {
@@ -54,6 +55,12 @@ public sealed partial class RetimerPage : Page
 
         ToolTipService.SetToolTip(SidebarToggle, loc["Loads"]);
 
+        // The cards copy their time on click and carry no other affordance for
+        // it, so they get a real tooltip now that the accidental accelerator one
+        // is suppressed.
+        ToolTipService.SetToolTip(PrimaryCard, loc["Copy Time"]);
+        ToolTipService.SetToolTip(SecondaryCard, loc["Copy Time"]);
+
         _suppressModeEvent = true;
         ModeSelector.Items.Clear();
         ModeSelector.Items.Add(loc["Load Mode"]);
@@ -75,15 +82,9 @@ public sealed partial class RetimerPage : Page
     private void BuildAccelerators()
     {
         var hotkeys = AppServices.Settings.Hotkeys;
+        _hotkeys = new PageHotkeys(this);
 
-        void Add(string actionId, Action action)
-        {
-            if (hotkeys.TryGetValue(actionId, out string? gesture) &&
-                KeyGesture.CreateAccelerator(gesture, action) is { } accelerator)
-            {
-                KeyboardAccelerators.Add(accelerator);
-            }
-        }
+        void Add(string actionId, Action action) => _hotkeys.Bind(hotkeys, actionId, action);
 
         Add("New Time", () => _ = VM.NewTimeAsync());
         Add("Open Time", () => _ = VM.OpenTimeAsync());
@@ -108,13 +109,7 @@ public sealed partial class RetimerPage : Page
         AddFixed("Ctrl+Y", VM.Redo);
         AddFixed("Ctrl+Shift+C", VM.CopyPrimaryTime);
 
-        void AddFixed(string gesture, Action action)
-        {
-            if (KeyGesture.CreateAccelerator(gesture, action) is { } accelerator)
-            {
-                KeyboardAccelerators.Add(accelerator);
-            }
-        }
+        void AddFixed(string gesture, Action action) => _hotkeys.Bind(gesture, action);
     }
 
     private void SyncModeSelector()
