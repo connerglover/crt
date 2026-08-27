@@ -2,8 +2,9 @@ name: Build and Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/windows-winui3"]
     tags: ["[0-9]+.[0-9]+.[0-9]+*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -17,137 +18,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
+          dotnet-version: "8.0.x"
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+      # No -p:Platform here: the solution maps "Any CPU" to x64 for the app
+      # project, and passing an explicit platform fails with MSB4126 because
+      # there is no x64 *solution* configuration.
+      - name: Build
+        working-directory: src-windows
+        run: dotnet build CRT.sln -c Release
 
-      - name: Build executable
-        working-directory: src
-        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt-windows main.py
+      - name: Test
+        working-directory: src-windows
+        run: dotnet test CRT.Core.Tests/CRT.Core.Tests.csproj -c Release --no-build
+
+      # Self-contained so the Windows App SDK runtime ships with the app and
+      # users don't need to install anything.
+      - name: Publish
+        working-directory: src-windows
+        run: dotnet publish CRT/CRT.csproj -c Release -r win-x64 --self-contained -o publish
+
+      - name: Package
+        working-directory: src-windows
+        run: Compress-Archive -Path publish/* -DestinationPath crt-windows.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: crt-windows
-          path: src/dist/crt-windows.exe
-          compression-level: 0
-
-  build-macos:
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller pillow
-
-      - name: Generate .icns icon
-        working-directory: src
-        run: |
-          python - <<'PY'
-          import os
-          from PIL import Image
-
-          im = Image.open("icon.ico").convert("RGBA")
-          os.makedirs("crt.iconset", exist_ok=True)
-          for size in (16, 32, 128, 256, 512):
-              im.resize((size, size), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}.png")
-              im.resize((size * 2, size * 2), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}@2x.png")
-          PY
-          iconutil -c icns crt.iconset -o icon.icns
-
-      - name: Build .app bundle
-        working-directory: src
-        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.icns --add-data "icon.ico:." --name crt main.py
-
-      - name: Build .dmg
-        working-directory: src
-        run: hdiutil create -volname CRT -srcfolder dist/crt.app -ov -format UDZO ../crt-macos.dmg
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: crt-macos
-          path: crt-macos.dmg
-          compression-level: 0
-
-  build-linux:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller pillow
-
-      - name: Build executable
-        working-directory: src
-        run: pyinstaller --noconfirm --onefile --name crt main.py
-
-      - name: Generate icon
-        working-directory: src
-        run: python -c "from PIL import Image; Image.open('icon.ico').convert('RGBA').save('icon.png')"
-
-      - name: Assemble AppDir
-        working-directory: src
-        run: |
-          mkdir -p crt.AppDir/usr/bin
-          cp dist/crt crt.AppDir/usr/bin/crt
-          cp icon.png crt.AppDir/crt.png
-          cat > crt.AppDir/crt.desktop <<EOF
-          [Desktop Entry]
-          Type=Application
-          Name=CRT
-          Exec=crt
-          Icon=crt
-          Categories=Utility;
-          EOF
-          ln -s usr/bin/crt crt.AppDir/AppRun
-
-      - name: Download appimagetool
-        working-directory: src
-        run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
-          chmod +x appimagetool
-
-      - name: Build AppImage
-        working-directory: src
-        run: ./appimagetool --appimage-extract-and-run crt.AppDir crt-linux.AppImage
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: crt-linux
-          path: src/crt-linux.AppImage
+          path: src-windows/crt-windows.zip
           compression-level: 0
 
   release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
