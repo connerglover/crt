@@ -326,21 +326,37 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Offers to save before closing, re-asking if the save is backed out of.
+    /// </summary>
+    /// <remarks>
+    /// This used a two-button Save/Don't Save prompt, which had no way to abort
+    /// the close at all — and because dismissing a ContentDialog reports
+    /// neither button, pressing Escape counted as "Don't Save" and closed the
+    /// app, discarding the run. The three-way prompt makes Escape mean Cancel,
+    /// so the destructive answer now has to be chosen deliberately.
+    /// </remarks>
     private async Task ConfirmExitAsync()
     {
-        bool save = await AppServices.Dialogs.ConfirmAsync(
-            AppServices.Loc["Exit"],
-            AppServices.Loc["Would you like to save?"],
-            AppServices.Loc["Save"],
-            AppServices.Loc["Don't Save"]);
-        if (save)
+        while (AppServices.Session.Dirty)
         {
-            await AppServices.Session.SaveAsync();
-            if (AppServices.Session.Dirty)
+            var choice = await AppServices.Dialogs.PromptSaveAsync(
+                AppServices.Loc["Exit"],
+                AppServices.Loc["Would you like to save?"]);
+            if (choice == SavePromptResult.Cancel)
             {
-                return; // save was cancelled — keep the app open
+                return; // keep the app open
             }
+            if (choice == SavePromptResult.DontSave)
+            {
+                break;
+            }
+
+            await AppServices.Session.SaveAsync();
+            // Still dirty means the file picker was cancelled; ask again rather
+            // than silently abandoning the close the user asked for.
         }
+
         AppServices.Autosave.Clear(); // clean exit
         _closeConfirmed = true;
         Close();

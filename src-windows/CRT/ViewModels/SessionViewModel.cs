@@ -639,26 +639,33 @@ public sealed partial class SessionViewModel : ObservableObject
     // ── File operations ────────────────────────────────────────────────────
 
     /// <summary>Port of <c>_prompt_save_if_dirty</c>: returns false when the caller should abort.</summary>
+    /// <remarks>
+    /// Cancelling the file picker re-asks rather than abandoning the whole
+    /// action. Python returned false straight away, which meant backing out of
+    /// the picker silently cancelled the New Time / Open the user had asked
+    /// for — nothing happened and nothing explained why. Looping keeps the
+    /// choice in the user's hands: "Don't Save" still proceeds and "Cancel"
+    /// still aborts, so unsaved work is never discarded without saying so.
+    /// </remarks>
     public async Task<bool> PromptSaveIfDirtyAsync(string title)
     {
-        if (!_files.Dirty)
+        while (_files.Dirty)
         {
-            return true;
-        }
+            var choice = await AppServices.Dialogs.PromptSaveAsync(
+                title, AppServices.Loc["Would you like to save the current time first?"]);
+            if (choice == SavePromptResult.Cancel)
+            {
+                return false;
+            }
+            if (choice == SavePromptResult.DontSave)
+            {
+                return true;
+            }
 
-        var choice = await AppServices.Dialogs.PromptSaveAsync(
-            title, AppServices.Loc["Would you like to save the current time first?"]);
-        if (choice == SavePromptResult.Cancel)
-        {
-            return false;
+            await SaveAsync();
+            // Still dirty means the save was backed out of; ask again.
         }
-        if (choice == SavePromptResult.DontSave)
-        {
-            return true;
-        }
-
-        await SaveAsync();
-        return !_files.Dirty;
+        return true;
     }
 
     [RelayCommand]
