@@ -44,6 +44,21 @@ func menuShortcut(for actionID: String) -> KeyboardShortcut? {
     return KeyboardShortcut(key, modifiers: modifiers)
 }
 
+/// Reads main-actor state from inside a `Commands` body.
+///
+/// `View.body` is `@MainActor`, but `Commands.body` is not, so synchronously
+/// reading an isolated model property here (a menu item's enabled state, a
+/// toggle's value) is rejected outright. SwiftUI always evaluates command
+/// bodies on the main thread, so asserting that isolation is sound — and it
+/// keeps the menu declarative instead of restructuring every item around an
+/// async hop, which a menu cannot wait for anyway.
+///
+/// Immutable `let` state (`loc`, `settings`) needs none of this: Swift already
+/// permits cross-actor reads of immutable Sendable values.
+private func mainState<T>(_ read: @MainActor () -> T) -> T {
+    MainActor.assumeIsolated(read)
+}
+
 /// Native menu bar (spec §6). Actions hop to the main actor explicitly since
 /// command closures are not statically isolated.
 struct CRTCommands: Commands {
@@ -169,13 +184,13 @@ struct CRTCommands: Commands {
                 runOnMain { AppModel.shared.undo() }
             }
             .keyboardShortcut(KeyboardShortcut("z", modifiers: [.command]))
-            .disabled(!AppModel.shared.canUndo)
+            .disabled(!mainState({ AppModel.shared.canUndo }))
 
             Button(loc["Redo"]) {
                 runOnMain { AppModel.shared.redo() }
             }
             .keyboardShortcut(KeyboardShortcut("z", modifiers: [.command, .shift]))
-            .disabled(!AppModel.shared.canRedo)
+            .disabled(!mainState({ AppModel.shared.canRedo }))
         }
 
         // Settings — replaces the framework-generated item so the shortcut
@@ -190,7 +205,7 @@ struct CRTCommands: Commands {
         // View — Always on Top (ON by default, spec §6)
         CommandGroup(after: .sidebar) {
             Toggle(loc["Always on Top"], isOn: Binding(
-                get: { AppModel.shared.alwaysOnTop },
+                get: { mainState({ AppModel.shared.alwaysOnTop }) },
                 set: { newValue in
                     runOnMain { AppModel.shared.setAlwaysOnTop(newValue) }
                 }
