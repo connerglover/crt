@@ -16,21 +16,102 @@
   <img src=".github/assets/screenshot.png" width="600" alt="CRT screenshot" />
 </div>
 
+## 📦 Three implementations
+
+CRT ships as a native app on Windows and macOS, with the original cross-platform
+Python build still covering Linux. All three read and write the same run files
+and the same `settings.ini`, so you can move between them freely.
+
+| | Source | Stack | Status |
+|---|---|---|---|
+| 🪟 **Windows** | [`src-windows/`](src-windows/) | C# · .NET 8 · WinUI 3 | Native rewrite |
+| 🍎 **macOS** | [`src-macos/`](src-macos/) | Swift 5.9 · SwiftUI | Native rewrite |
+| 🐧 **Linux** | [`src/`](src/) | Python · PySide6 | Original |
+
+The native rewrites are built to a shared specification —
+[`docs/native-rewrite-spec.md`](docs/native-rewrite-spec.md) — which is the
+source of truth for behavior on both platforms.
+
 ## ✨ Features
 
+**Retiming**
+
 - Time a run by frame, or by pasting a timestamp / YouTube debug string
-- Track individual loads with automatic totals, with and without loads
+- **Load mode** — start of run, end of run, and individual loads subtracted, with
+  automatic totals both with and without loads
+- **Segment mode** — mark any number of segments and total them, with the full-run
+  span tracked alongside
+- Automatic YouTube framerate detection, so a pasted debug string can't be
+  silently converted at the wrong FPS
+- Inline-editable load/segment sidebar with per-entry durations
+
+**Video retimer** *(native apps)*
+
+- Import a YouTube URL, a direct video URL, or a local video file
+- Frame-by-frame navigation with `<` / `>`, play/pause, and jump controls
+- Mark segment or load boundaries with a button or a hotkey, straight from playback
+- Export the retimed video with a LiveSplit-style timer burned into the corner —
+  the clock runs during gameplay, freezes through loads, and holds the final time
+
+**Dashboard** *(native apps)*
+
+- A run library of everything you've timed, with times, mode, and quick actions
+- Speedrun.com integration — sign in with your API key
+- **Runs to Verify** — every pending run across the games you moderate, with
+  watch, retime, verify, and reject without leaving the app
+
+**Everything else**
+
 - Customizable mod note format ([available placeholders](Mod%20Note%20Format.MD))
+- Copy as a mod note, a Discord message, or a YouTube chapter list
 - Fully customizable hotkeys for every action
-- Session history — save, reload, and revisit past runs
+- Session history and a persistent recent-files list
+- Undo/redo, autosave, and crash recovery
 - Always-on-top mode and automatic update checks
 - English, Français, Polski, and Español
 
-## 📦 Installation
+## 📥 Installation
 
-Grab the latest build for your platform from [Releases](https://github.com/connerglover/crt/releases/latest) and run it.
+Grab the latest build for your platform from
+[Releases](https://github.com/connerglover/crt/releases/latest) and run it.
 
-## 🐍 Running from Source
+## 🔨 Building from source
+
+<details>
+<summary><b>🪟 Windows — C# / WinUI 3</b></summary>
+
+Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download). No Visual
+Studio needed.
+
+```bash
+dotnet build src-windows/CRT.sln
+dotnet test  src-windows/CRT.Core.Tests/CRT.Core.Tests.csproj
+dotnet run --project src-windows/CRT/CRT.csproj
+```
+
+See [`src-windows/README.md`](src-windows/README.md) for details.
+
+</details>
+
+<details>
+<summary><b>🍎 macOS — Swift / SwiftUI</b></summary>
+
+Requires macOS 14+ and Swift 5.9 (Xcode 15+).
+
+```bash
+cd src-macos
+swift build
+swift test
+make app       # bundles build/CRT.app
+```
+
+Or open `src-macos/Package.swift` directly in Xcode. See
+[`src-macos/README.md`](src-macos/README.md) for details.
+
+</details>
+
+<details>
+<summary><b>🐧 Linux — Python</b></summary>
 
 Requires Python 3.10+.
 
@@ -39,50 +120,7 @@ pip install -r requirements.txt
 python src/main.py
 ```
 
-## 🔨 Building the Executable
-
-Windows, macOS, and Linux binaries are built automatically by the [build workflow](.github/workflows/build.yml) and attached to a GitHub Release whenever a version tag (e.g. `1.2.2`) is pushed. To build locally:
-
-<details>
-<summary><b>🪟 Windows</b></summary>
-
-```bash
-pip install -r requirements.txt pyinstaller
-cd src
-pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt main.py
-```
-
-Output: `src/dist/crt.exe`
-
-</details>
-
-<details>
-<summary><b>🍎 macOS</b></summary>
-
-```bash
-pip install -r requirements.txt pyinstaller pillow
-cd src
-python - <<'PY'
-import os
-from PIL import Image
-
-im = Image.open("icon.ico").convert("RGBA")
-os.makedirs("crt.iconset", exist_ok=True)
-for size in (16, 32, 128, 256, 512):
-    im.resize((size, size), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}.png")
-    im.resize((size * 2, size * 2), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}@2x.png")
-PY
-iconutil -c icns crt.iconset -o icon.icns
-pyinstaller --onefile --windowed --icon=icon.icns --add-data "icon.ico:." --name crt main.py
-hdiutil create -volname CRT -srcfolder dist/crt.app -ov -format UDZO ../crt-macos.dmg
-```
-
-Output: `src/dist/crt.app`, packaged as `crt-macos.dmg`
-
-</details>
-
-<details>
-<summary><b>🐧 Linux</b></summary>
+To build a binary:
 
 ```bash
 pip install -r requirements.txt pyinstaller
@@ -90,9 +128,16 @@ cd src
 pyinstaller --onefile --name crt main.py
 ```
 
-Output: `src/dist/crt` (the [build workflow](.github/workflows/build.yml) additionally packages this as an AppImage)
+Output: `src/dist/crt` (the [build workflow](.github/workflows/build.yml)
+additionally packages this as an AppImage).
 
 </details>
+
+## 🎬 Video features
+
+The video retimer and YouTube import rely on **ffmpeg** and **yt-dlp**. The
+native apps look for them on your `PATH` first and offer to download them on
+demand if they're missing — nothing to install up front.
 
 ## 🤝 Contributing
 
