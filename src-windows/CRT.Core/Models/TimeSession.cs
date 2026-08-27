@@ -49,9 +49,18 @@ public sealed class TimeSession
     /// <summary>Sum of segment lengths in frames.</summary>
     public int SegmentTotalFrames => Segments.Sum(s => s.Length);
 
+    /// <summary>
+    /// Segments that actually cover time. "Add Segment" appends a blank row for
+    /// the user to fill in, and an unfilled 0-0 row must not drag the run bounds
+    /// down to frame zero while they are typing.
+    /// </summary>
+    public IEnumerable<Segment> FilledSegments => Segments.Where(s => s.Length > 0);
+
     /// <summary>Span from earliest segment start to latest segment end, in frames.</summary>
     public int FullRunFrames =>
-        Segments.Count == 0 ? 0 : Segments.Max(s => s.EndFrame) - Segments.Min(s => s.StartFrame);
+        FilledSegments.Any()
+            ? FilledSegments.Max(s => s.EndFrame) - FilledSegments.Min(s => s.StartFrame)
+            : 0;
 
     /// <summary>Segment total in seconds (the primary display in segment mode).</summary>
     public decimal SegmentTotal => FramesToSeconds(SegmentTotalFrames);
@@ -140,6 +149,13 @@ public sealed class TimeSession
     public void DeleteLoad(int index) => Loads.RemoveAt(index);
 
     public void ClearLoads() => Loads.Clear();
+
+    /// <summary>
+    /// Appends an empty segment row, deliberately skipping validation: the user
+    /// fills it in from the retimer page, and committing a field validates it
+    /// then. Zero-length rows are excluded from the run bounds until filled.
+    /// </summary>
+    public void AddBlankSegment() => Segments.Add(new Segment(0, 0));
 
     public void AddSegment(int startFrame, int endFrame)
     {

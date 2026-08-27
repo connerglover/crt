@@ -294,6 +294,18 @@ public sealed partial class SessionViewModel : ObservableObject
     [RelayCommand]
     private async Task AddRangeAsync()
     {
+        // Segment mode edits each row in place and has no shared start/end
+        // inputs to read, so Add Segment appends a row to fill in rather than
+        // validating two fields that are not on screen.
+        if (Session.Mode == TimingMode.Segments)
+        {
+            PushUndo();
+            Session.AddBlankSegment();
+            _files.Dirty = true;
+            RefreshAll();
+            return;
+        }
+
         int start = int.TryParse(RangeStartText, out int s) ? s : 0;
         int end = int.TryParse(RangeEndText, out int e) ? e : 0;
 
@@ -413,6 +425,38 @@ public sealed partial class SessionViewModel : ObservableObject
         _ = CommitRowAsync(index, startText, endText);
     }
 
+    /// <summary>
+    /// Pastes the clipboard into one field of an existing row. Segment rows are
+    /// edited in place on the retimer page, so each field gets its own Paste
+    /// button rather than routing through the shared range inputs.
+    /// </summary>
+    public async Task PasteRowFieldAsync(int index, bool start)
+    {
+        if (index < 0 || index >= Rows.Count)
+        {
+            return;
+        }
+
+        var row = Rows[index];
+        try
+        {
+            int frame = await ParseFrameAsync(await ClipboardService.GetTextAsync());
+            if (start)
+            {
+                row.StartText = frame.ToString(CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                row.EndText = frame.ToString(CultureInfo.InvariantCulture);
+            }
+            await CommitRowAsync(index, row.StartText, row.EndText);
+        }
+        catch (ValidationException ex)
+        {
+            await AppServices.Dialogs.ShowErrorAsync(ex.Message);
+        }
+    }
+
     private async Task CommitRowAsync(int index, string startText, string endText)
     {
         try
@@ -502,10 +546,6 @@ public sealed partial class SessionViewModel : ObservableObject
     }
 
     // ── Mode switching ─────────────────────────────────────────────────────
-
-    [RelayCommand]
-    public void ToggleMode() =>
-        SetMode(Session.Mode == TimingMode.Loads ? TimingMode.Segments : TimingMode.Loads);
 
     public void SetMode(TimingMode mode)
     {
@@ -682,6 +722,10 @@ public sealed partial class SessionViewModel : ObservableObject
         UpdateUndoState();
         SyncInputsFromSession();
         RefreshAll();
+
+        // The video belongs to the run that was just discarded; keeping it open
+        // would invite marking a new run against the old footage.
+        AppServices.VideoRetimer.CloseVideo();
         SessionReloaded?.Invoke(this, EventArgs.Empty);
     }
 
@@ -743,6 +787,10 @@ public sealed partial class SessionViewModel : ObservableObject
         SyncInputsFromSession();
         RefreshAll();
         SessionReloaded?.Invoke(this, EventArgs.Empty);
+
+        // Bring back the footage this run was timed against, if it is still
+        // there. Awaited last so a slow probe cannot delay showing the times.
+        await AppServices.VideoRetimer.RestoreVideoForSessionAsync();
     }
 
     [RelayCommand]
@@ -842,8 +890,12 @@ public sealed partial class SessionViewModel : ObservableObject
 
         PrimaryTimeText = TimeFormatter.FormatIso(Session.PrimarySeconds);
         SecondaryTimeText = TimeFormatter.FormatIso(Session.SecondarySeconds);
-        PrimaryLabel = segments ? loc["Segment Total"] : loc["Without Loads"];
-        SecondaryLabel = segments ? loc["Full Run"] : loc["With Loads"];
+        // Both modes read as "Without Loads" / "With Loads". In segment mode the
+        // numbers behind them are the segment total and the full-run span, but
+        // those are the same two quantities under different names, and the
+        // loads wording is what mod notes and speedrun.com use.
+        PrimaryLabel = loc["Without Loads"];
+        SecondaryLabel = loc["With Loads"];
         RangeStartLabel = segments ? loc["Segment Start"] : loc["Start Frame (Loads)"];
         RangeEndLabel = segments ? loc["Segment End"] : loc["End Frame (Loads)"];
         AddRangeLabel = segments ? loc["Add Segment"] : loc["Add Loads"];

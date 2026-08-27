@@ -1,3 +1,4 @@
+using System.Linq;
 using CRT.Core.Tools;
 using Xunit;
 
@@ -143,5 +144,104 @@ public class FfmpegExporterTests
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
         }, args);
+    }
+}
+
+public class DualTimerTests
+{
+    private static readonly TimerFiltergraphBuilder.Pause[] OneLoad =
+        { new(2m, 3m) };
+
+    private static TimerOverlayOptions Options(bool both, string corner = "bottom-right") =>
+        new(VideoHeight: 1080, Corner: corner)
+        {
+            ShowBothTimers = both,
+            WithoutLoadsLabel = "Without Loads",
+            WithLoadsLabel = "With Loads",
+        };
+
+    [Fact]
+    public void SingleTimerIsUnchangedByTheDualOption()
+    {
+        // The default path must produce what it did before the option existed:
+        // no caption, and every line flush against the corner with no stacking
+        // offset applied.
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: false));
+        Assert.DoesNotContain("Without Loads", chain);
+        Assert.DoesNotContain("With Loads", chain);
+        Assert.DoesNotContain(":y=h-th-24-", chain);
+        Assert.Contains(":y=h-th-24:", chain);
+    }
+
+    [Fact]
+    public void BothTimersAreDrawnAndLabelled()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
+        Assert.Contains("Without Loads", chain);
+        Assert.Contains("With Loads", chain);
+    }
+
+    [Fact]
+    public void OnlyTheLoadlessTrackFreezes()
+    {
+        // The real-time clock ignores the loads entirely, so the frozen constant
+        // that the loadless track emits during the load must not appear on it.
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
+        string[] tracks = chain.Split("With Loads");
+
+        // Everything before the first "With Loads" caption belongs to the
+        // loadless track, which freezes at 00:00:01.000 for the load window.
+        Assert.Contains("between(t,2,3)", tracks[0]);
+        Assert.Contains("Without Loads 00\\:00\\:01.000", tracks[0]);
+
+        // The real-time track spans the run with no frozen window inside it.
+        string realtime = string.Join("With Loads", tracks[1..]);
+        Assert.DoesNotContain("between(t,2,3)", realtime);
+    }
+
+    [Fact]
+    public void FinalTimesDifferByTheLoadLength()
+    {
+        // 4s run with a 1s load: 00:00:03.000 loadless, 00:00:04.000 real time.
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
+        Assert.Contains("Without Loads 00\\:00\\:03.000", chain);
+        Assert.Contains("With Loads 00\\:00\\:04.000", chain);
+    }
+
+    [Fact]
+    public void BottomCornerStacksUpwardsSoTheBlockStaysOnTheEdge()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
+        // Second line sits on the edge, first line one line-height (1.5 x the
+        // 60px font at 1080p) above it.
+        Assert.Contains(":y=h-th-24-90:", chain);
+        Assert.Contains(":y=h-th-24:", chain);
+    }
+
+    [Fact]
+    public void TopCornerStacksDownwards()
+    {
+        string chain = TimerFiltergraphBuilder.Build(
+            1m, 5m, OneLoad, 0m, Options(both: true, corner: "top-left"));
+        Assert.Contains(":y=24:", chain);
+        Assert.Contains(":y=114:", chain);
+        Assert.Contains(":x=24:", chain);
+    }
+
+    [Fact]
+    public void ApostropheInALabelCannotBreakTheFilter()
+    {
+        // A stray quote would close text='...' and make ffmpeg reject the graph.
+        var options = new TimerOverlayOptions(VideoHeight: 1080)
+        {
+            ShowBothTimers = true,
+            WithoutLoadsLabel = "Sans l'chargement",
+            WithLoadsLabel = "With Loads",
+        };
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, options);
+        Assert.Contains("Sans lchargement", chain);
+        // Every quote in the graph must still be part of a matched pair, or
+        // ffmpeg cannot parse the filter at all.
+        Assert.Equal(0, chain.Count(c => c == '\'') % 2);
     }
 }

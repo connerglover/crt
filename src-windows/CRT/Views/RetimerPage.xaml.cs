@@ -18,7 +18,6 @@ public sealed partial class RetimerPage : Page
     private static readonly string[] FramerateQuickPicks =
         { "24", "25", "29.97", "30", "50", "59.94", "60" };
 
-    private bool _suppressModeEvent;
     private PageHotkeys _hotkeys = null!;
 
     public RetimerPage()
@@ -28,8 +27,8 @@ public sealed partial class RetimerPage : Page
         BuildFramerateQuickPicks();
         BuildAccelerators();
 
-        VM.SessionReloaded += (_, _) => SyncModeSelector();
-        Loaded += (_, _) => SyncModeSelector();
+        VM.SessionChanged += (_, _) => SyncModeCaption();
+        Loaded += (_, _) => SyncModeCaption();
     }
 
     public SessionViewModel VM => AppServices.Session;
@@ -61,11 +60,8 @@ public sealed partial class RetimerPage : Page
         ToolTipService.SetToolTip(PrimaryCard, loc["Copy Time"]);
         ToolTipService.SetToolTip(SecondaryCard, loc["Copy Time"]);
 
-        _suppressModeEvent = true;
-        ModeSelector.Items.Clear();
-        ModeSelector.Items.Add(loc["Load Mode"]);
-        ModeSelector.Items.Add(loc["Segment Mode"]);
-        _suppressModeEvent = false;
+        NoSegmentsHint.Text = loc["No segments"];
+        SyncModeCaption();
     }
 
     private void BuildFramerateQuickPicks()
@@ -101,7 +97,6 @@ public sealed partial class RetimerPage : Page
         Add("start_loads_paste", () => _ = VM.PasteRangeStartAsync());
         Add("end_loads_paste", () => _ = VM.PasteRangeEndAsync());
         Add("Add Loads", () => _ = AddRangeFromFocusedAsync());
-        Add("Toggle Mode", VM.ToggleMode);
 
         // Fixed bindings (spec §14): undo/redo + quick time copy.
         AddFixed("Ctrl+Z", VM.Undo);
@@ -112,22 +107,44 @@ public sealed partial class RetimerPage : Page
         void AddFixed(string gesture, Action action) => _hotkeys.Bind(gesture, action);
     }
 
-    private void SyncModeSelector()
-    {
-        _suppressModeEvent = true;
-        ModeSelector.SelectedIndex = VM.IsSegmentMode ? 1 : 0;
-        _suppressModeEvent = false;
-    }
+    /// <summary>
+    /// Reports the active mode. Switching it is a Settings checkbox now, so this
+    /// is a label rather than a control.
+    /// </summary>
+    private void SyncModeCaption() =>
+        ModeCaption.Text = AppServices.Loc[VM.IsSegmentMode ? "Segment Mode" : "Classic Mode"];
 
     // ── Mode / sidebar ─────────────────────────────────────────────────────
 
-    private void OnModeChanged(object sender, SelectionChangedEventArgs e)
+    // ── Inline segment rows ────────────────────────────────────────────────
+
+    private void OnRowFieldLostFocus(object sender, RoutedEventArgs e) =>
+        CommitRowField((TextBox)sender);
+
+    private void OnRowFieldKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (_suppressModeEvent || ModeSelector.SelectedIndex < 0)
+        if (e.Key == Windows.System.VirtualKey.Enter)
+        {
+            e.Handled = true;
+            CommitRowField((TextBox)sender);
+        }
+    }
+
+    private static void CommitRowField(TextBox box)
+    {
+        if (box.DataContext is not RangeRowViewModel row)
         {
             return;
         }
-        VM.SetMode(ModeSelector.SelectedIndex == 1 ? TimingMode.Segments : TimingMode.Loads);
+        if ((string?)box.Tag == "start")
+        {
+            row.StartText = box.Text;
+        }
+        else
+        {
+            row.EndText = box.Text;
+        }
+        row.Commit();
     }
 
     private void OnSidebarToggle(object sender, RoutedEventArgs e)

@@ -6,15 +6,14 @@
     <Grid x:Name="RootGrid">
         <Grid.Resources>
             <!--
-                NavigationView paints opaque layer brushes across the pane and
-                the content area, which covered the Mica backdrop completely.
-                Clearing them lets the backdrop show through; the card styles in
-                App.xaml still supply the layered surfaces on top of it.
+                Only the navigation pane is cleared, so Mica shows there and in
+                the title bar. The content area keeps its layer brush and its
+                divider: clearing those too left every working surface see-through
+                with nothing to sit on, which is the standard Fluent arrangement
+                inverted rather than achieved.
             -->
-            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
             <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
             <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
-            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
         </Grid.Resources>
 
         <Grid.RowDefinitions>

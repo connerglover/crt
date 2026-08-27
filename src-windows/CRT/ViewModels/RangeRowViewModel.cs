@@ -26,6 +26,9 @@ public sealed partial class RangeRowViewModel : ObservableObject
     /// <summary>ISO duration chip text.</summary>
     public string DurationText { get; }
 
+    /// <summary>Caption for the per-field Paste buttons on the segment rows.</summary>
+    public string PasteLabel => CRT.Services.AppServices.Loc["Paste"];
+
     [ObservableProperty]
     private string _startText;
 
@@ -34,6 +37,12 @@ public sealed partial class RangeRowViewModel : ObservableObject
 
     [RelayCommand]
     private void Delete() => _parent.DeleteRow(Index);
+
+    [RelayCommand]
+    private Task PasteStartAsync() => _parent.PasteRowFieldAsync(Index, start: true);
+
+    [RelayCommand]
+    private Task PasteEndAsync() => _parent.PasteRowFieldAsync(Index, start: false);
 
     /// <summary>Commits the inline edit (Enter / focus loss).</summary>
     public void Commit() => _parent.CommitRow(Index, StartText, EndText);

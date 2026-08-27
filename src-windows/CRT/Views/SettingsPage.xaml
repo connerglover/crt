@@ -25,7 +25,6 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Name="ThemeLabel" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
@@ -97,14 +96,21 @@
                 <TextBlock x:Name="YtDlpLabel" Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" />
                 <TextBox Grid.Row="7" Grid.Column="1" Text="{x:Bind VM.YtDlpPath, Mode=TwoWay}" />
 
-                <TextBlock x:Name="DefaultModeLabel" Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" />
-                <ComboBox
-                    x:Name="DefaultModeCombo"
-                    Grid.Row="8"
-                    Grid.Column="1"
-                    HorizontalAlignment="Stretch"
-                    SelectedIndex="{x:Bind VM.DefaultModeIndex, Mode=TwoWay}" />
             </Grid>
+
+            <!--
+                Timing mode and the dual-timer export are single opt-ins, so they
+                are checkboxes here rather than a control on the retimer page.
+            -->
+            <StackPanel Spacing="4">
+                <CheckBox x:Name="ClassicModeCheck" IsChecked="{x:Bind VM.ClassicMode, Mode=TwoWay}" />
+                <TextBlock x:Name="ClassicModeHint" Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="30,0,0,0" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <CheckBox x:Name="DualTimerCheck" IsChecked="{x:Bind VM.DualTimer, Mode=TwoWay}" />
+                <TextBlock x:Name="DualTimerHint" Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="30,0,0,0" />
+            </StackPanel>
 
             <Button x:Name="HotkeysButton" Command="{x:Bind VM.CustomizeHotkeysCommand}" />
 

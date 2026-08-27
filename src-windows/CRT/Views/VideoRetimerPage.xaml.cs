@@ -19,6 +19,7 @@ public sealed partial class VideoRetimerPage : Page
 {
     private DispatcherQueueTimer? _positionTimer;
     private PageHotkeys _hotkeys = null!;
+    private bool _suppressSpeedEvent;
     private bool _suppressSliderEvent;
     private bool _sliderDragging;
 
@@ -59,7 +60,35 @@ public sealed partial class VideoRetimerPage : Page
         MarkLoadStartButton.Content = loc["Mark Load Start"];
         MarkLoadEndButton.Content = loc["Mark Load End"];
         ExportButton.Content = loc["Export Retimed Video"];
+        ToolTipService.SetToolTip(ScanBackButton, loc["Rewind"]);
+        ToolTipService.SetToolTip(ScanForwardButton, loc["Fast Forward"]);
+        ToolTipService.SetToolTip(SpeedCombo, loc["Playback Speed"]);
+        BuildSpeedPicker();
         UpdateMarkButtonLabels();
+    }
+
+    private void BuildSpeedPicker()
+    {
+        _suppressSpeedEvent = true;
+        SpeedCombo.Items.Clear();
+        foreach (double rate in VideoRetimerViewModel.PlaybackRates)
+        {
+            SpeedCombo.Items.Add(FormatRate(rate));
+        }
+        SpeedCombo.SelectedIndex = VideoRetimerViewModel.PlaybackRates.ToList().IndexOf(VM.PlaybackRate);
+        _suppressSpeedEvent = false;
+    }
+
+    private static string FormatRate(double rate) =>
+        rate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "x";
+
+    private void OnSpeedChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSpeedEvent || SpeedCombo.SelectedIndex < 0)
+        {
+            return;
+        }
+        VM.SetPlaybackRate(VideoRetimerViewModel.PlaybackRates[SpeedCombo.SelectedIndex]);
     }
 
     private void UpdateMarkButtonLabels()
@@ -85,7 +114,6 @@ public sealed partial class VideoRetimerPage : Page
         Add("video_mark_end", () => _ = VM.MarkEndAsync());
         Add("video_mark_load_start", () => _ = VM.MarkLoadStartAsync());
         Add("video_mark_load_end", () => _ = VM.MarkLoadEndAsync());
-        Add("Toggle Mode", SessionVM.ToggleMode);
 
         // Shift variants of , and . step too (spec: "< / >").
         AddFixed("Shift+,", VM.StepBackward);
@@ -95,6 +123,11 @@ public sealed partial class VideoRetimerPage : Page
         AddFixed("Right", () => VM.JumpFrames(5));
         AddFixed("Shift+Left", () => VM.JumpSeconds(-1m));
         AddFixed("Shift+Right", () => VM.JumpSeconds(1m));
+        // Shuttle. The usual J/K/L is unavailable: L and Shift+L are already the
+        // load-mark keys, so scanning uses the arrow pair it sits next to.
+        AddFixed("Ctrl+Left", VM.ScanBackward);
+        AddFixed("Ctrl+Right", VM.ScanForward);
+        AddFixed("K", VM.StopScan);
         // Shared copy/save shortcuts stay available here.
         AddFixed("Ctrl+Z", SessionVM.Undo);
         AddFixed("Ctrl+Shift+Z", SessionVM.Redo);

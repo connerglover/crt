@@ -15,7 +15,14 @@ public sealed class RunMeta
     /// <summary>ISO-8601 last-modified timestamp, refreshed on every save.</summary>
     public string Modified { get; set; } = "";
 
+    /// <summary>The URL the video was imported from, if any.</summary>
     public string VideoUrl { get; set; } = "";
+
+    /// <summary>
+    /// Local path of the video this run was timed against. Reopening the run
+    /// reloads it, so a saved session brings its footage back with it.
+    /// </summary>
+    public string VideoPath { get; set; } = "";
 
     public RunMeta Clone() => new()
     {
@@ -25,5 +32,6 @@ public sealed class RunMeta
         Created = Created,
         Modified = Modified,
         VideoUrl = VideoUrl,
+        VideoPath = VideoPath,
     };
 }

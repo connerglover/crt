@@ -33,7 +33,10 @@ public sealed partial class SettingsPage : Page
         TimerStyleLabel.Text = loc["Timer Style"];
         FfmpegLabel.Text = loc["FFmpeg Path"];
         YtDlpLabel.Text = loc["yt-dlp Path"];
-        DefaultModeLabel.Text = loc["Default Mode"];
+        ClassicModeCheck.Content = loc["Classic Mode"];
+        ClassicModeHint.Text = loc["Classic Mode Description"];
+        DualTimerCheck.Content = loc["Dual Timer"];
+        DualTimerHint.Text = loc["Dual Timer Description"];
         HotkeysButton.Content = loc["Customize Hotkeys"];
         ApplyButton.Content = loc["Apply"];
         CancelButton.Content = loc["Cancel"];
@@ -44,7 +47,6 @@ public sealed partial class SettingsPage : Page
         Fill(LanguageCombo, VM.LanguageOptions);
         Fill(TimerCornerCombo, VM.TimerCornerOptions);
         Fill(TimerStyleCombo, VM.TimerStyleOptions);
-        Fill(DefaultModeCombo, VM.DefaultModeOptions);
 
         // Re-apply indexes after filling (SelectedIndex resets when items change).
         VM.CancelCommand.Execute(null);

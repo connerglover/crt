@@ -104,7 +104,10 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal("bottom-right", settings.TimerCorner);
         Assert.Equal("pill", settings.TimerStyle);
         Assert.Equal("", settings.FfmpegPath);
-        Assert.Equal("loads", settings.DefaultMode);
+        // Segment mode is the default; classic is the opt-in.
+        Assert.Equal("segments", settings.DefaultMode);
+        Assert.False(settings.ClassicMode);
+        Assert.False(settings.DualTimer);
         Assert.Equal("Ctrl+N", settings.Hotkeys["New Time"]);
         Assert.Equal(",", settings.Hotkeys["video_frame_back"]);
     }
@@ -132,7 +135,9 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal("bottom-right", settings.TimerCorner);
         string text = File.ReadAllText(IniPath);
         Assert.Contains("timer_corner = bottom-right", text);
-        Assert.Contains("toggle_mode = Ctrl+T", text);
+        Assert.Contains("dual_timer = False", text);
+        Assert.Contains("default_mode = segments", text);
+        Assert.Contains("video_frame_back = ,", text);
         Assert.Contains("enable_updates = False", text);
     }
 
@@ -173,7 +178,6 @@ public class HotkeyRegistryTests
     [InlineData("Save As", "save_as")]
     [InlineData("start_paste", "start_paste")]
     [InlineData("Paste Start Frame (Loads)", "paste_start_frame_loads")]
-    [InlineData("Toggle Mode", "toggle_mode")]
     [InlineData("video_frame_back", "video_frame_back")]
     public void SlugRule(string actionId, string expected)
     {
@@ -205,7 +209,10 @@ public class HotkeyRegistryTests
         Assert.Equal("]", HotkeyRegistry.Defaults["video_mark_end"]);
         Assert.Equal("L", HotkeyRegistry.Defaults["video_mark_load_start"]);
         Assert.Equal("Shift+L", HotkeyRegistry.Defaults["video_mark_load_end"]);
-        Assert.Equal("Ctrl+T", HotkeyRegistry.Defaults["Toggle Mode"]);
+
+        // Timing mode moved to a Settings checkbox, so it no longer has a
+        // hotkey to bind or a menu entry to show.
+        Assert.DoesNotContain("Toggle Mode", HotkeyRegistry.Defaults.Keys);
     }
 
     [Fact]

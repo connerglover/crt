@@ -48,6 +48,7 @@ public static class RunFileStore
         sb.Append(", \"created\": ").Append(JsonString(session.Meta.Created));
         sb.Append(", \"modified\": ").Append(JsonString(session.Meta.Modified));
         sb.Append(", \"video_url\": ").Append(JsonString(session.Meta.VideoUrl));
+        sb.Append(", \"video_path\": ").Append(JsonString(session.Meta.VideoPath));
         sb.Append("}}");
         return sb.ToString();
     }
@@ -90,7 +91,12 @@ public static class RunFileStore
                 session.Loads.Add(new Load(pair.Item1, pair.Item2));
             }
 
-            // New-format extras: absent → loads mode (plain Python file).
+            // New-format extras. A file with no "mode" is a plain Python file,
+            // whose start/end/loads only mean anything in classic mode — so it
+            // is pinned here rather than left to whatever the current default
+            // happens to be. New sessions default to segments via settings;
+            // letting that leak in here would silently reinterpret old runs.
+            session.Mode = TimingMode.Loads;
             if (root.TryGetProperty("mode", out JsonElement modeElement) && modeElement.ValueKind == JsonValueKind.String)
             {
                 session.Mode = TimingModeExtensions.ParseSerialString(modeElement.GetString());
@@ -116,6 +122,7 @@ public static class RunFileStore
                     Created = ReadString(metaElement, "created"),
                     Modified = ReadString(metaElement, "modified"),
                     VideoUrl = ReadString(metaElement, "video_url"),
+                    VideoPath = ReadString(metaElement, "video_path"),
                 };
             }
 

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CRT.Core.Localization;
+using CRT.Core.Models;
 using CRT.Core.Settings;
 using CRT.Services;
 
@@ -39,11 +40,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         AppServices.Loc["Pill"], AppServices.Loc["Plain"],
     };
 
-    public IReadOnlyList<string> DefaultModeOptions { get; } = new[]
-    {
-        AppServices.Loc["Load Mode"], AppServices.Loc["Segment Mode"],
-    };
-
     [ObservableProperty]
     private bool _enableUpdates;
 
@@ -71,8 +67,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _ytDlpPath = "";
 
+    /// <summary>
+    /// The timing mode now lives here rather than on the retimer page, as a
+    /// single opt-in: segment mode is the default and this reverts to the
+    /// classic start/end-with-loads workflow.
+    /// </summary>
     [ObservableProperty]
-    private int _defaultModeIndex;
+    private bool _classicMode;
+
+    [ObservableProperty]
+    private bool _dualTimer;
 
     /// <summary>Working copy of the hotkeys, edited by the hotkey dialog.</summary>
     public Dictionary<string, string> Hotkeys { get; private set; } = new();
@@ -95,7 +99,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         TimerStyleIndex = settings.TimerStyle == "plain" ? 1 : 0;
         FfmpegPath = settings.FfmpegPath;
         YtDlpPath = settings.YtDlpPath;
-        DefaultModeIndex = settings.DefaultMode == "segments" ? 1 : 0;
+        ClassicMode = settings.ClassicMode;
+        DualTimer = settings.DualTimer;
         Hotkeys = new Dictionary<string, string>(settings.Hotkeys);
     }
 
@@ -117,7 +122,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         settings.TimerStyle = TimerStyleIndex == 1 ? "plain" : "pill";
         settings.FfmpegPath = FfmpegPath.Trim();
         settings.YtDlpPath = YtDlpPath.Trim();
-        settings.DefaultMode = DefaultModeIndex == 1 ? "segments" : "loads";
+        settings.ClassicMode = ClassicMode;
+        settings.DualTimer = DualTimer;
         settings.Hotkeys = new Dictionary<string, string>(Hotkeys);
         return settings;
     }
@@ -134,6 +140,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         // Theme is cheap to re-apply, so it takes effect immediately rather than
         // waiting for the restart the remaining settings still need.
         AppServices.MainWindow?.ApplyTheme(newSettings.Theme);
+
+        // This checkbox is the only way to change timing mode, so it has to act
+        // on the open session rather than only on the next one.
+        AppServices.Session.SetMode(TimingModeExtensions.ParseSerialString(newSettings.DefaultMode));
 
         if (!newSettings.ContentEquals(oldSettings))
         {

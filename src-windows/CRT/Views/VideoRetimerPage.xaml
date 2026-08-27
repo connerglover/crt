@@ -73,27 +73,39 @@
                 ValueChanged="OnSliderValueChanged" />
         </Grid>
 
-        <!-- Transport + readouts -->
-        <Grid Grid.Row="4" Grid.Column="0" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Content="◀" Command="{x:Bind VM.StepBackwardCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
-            <Button x:Name="PlayPauseButton" Grid.Column="1" MinWidth="90" Command="{x:Bind VM.PlayPauseCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
-            <Button Grid.Column="2" Content="▶" Command="{x:Bind VM.StepForwardCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center" Margin="10,0,0,0">
+        <!--
+            Transport on one line, readouts on the next: the scan buttons and the
+            speed picker leave no room to keep them side by side, and a clipped
+            frame counter is worse than a second row.
+        -->
+        <StackPanel Grid.Row="4" Grid.Column="0" Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="ScanBackButton" Content="◀◀" Command="{x:Bind VM.ScanBackwardCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
+                <Button Content="◀" Command="{x:Bind VM.StepBackwardCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
+                <Button x:Name="PlayPauseButton" MinWidth="90" Command="{x:Bind VM.PlayPauseCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
+                <Button Content="▶" Command="{x:Bind VM.StepForwardCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
+                <Button x:Name="ScanForwardButton" Content="▶▶" Command="{x:Bind VM.ScanForwardCommand}" IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}" />
+                <ComboBox
+                    x:Name="SpeedCombo"
+                    MinWidth="86"
+                    IsEnabled="{x:Bind VM.HasVideo, Mode=OneWay}"
+                    SelectionChanged="OnSpeedChanged" />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Margin="4,0,0,0"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                    Text="{x:Bind VM.ScanText, Mode=OneWay}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                 <TextBlock x:Name="FrameReadoutLabel" Opacity="0.6" VerticalAlignment="Center" FontSize="12" />
                 <TextBlock FontFamily="Consolas" VerticalAlignment="Center" Text="{x:Bind VM.CurrentFrameText, Mode=OneWay}" />
                 <TextBlock x:Name="TimeReadoutLabel" Opacity="0.6" VerticalAlignment="Center" FontSize="12" />
                 <TextBlock FontFamily="Consolas" VerticalAlignment="Center" Text="{x:Bind VM.CurrentTimeText, Mode=OneWay}" />
-                <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="12" Text="{x:Bind VM.VideoInfoText, Mode=OneWay}" />
+                <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis" Text="{x:Bind VM.VideoInfoText, Mode=OneWay}" />
+                <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind VM.PendingMarkText, Mode=OneWay}" />
             </StackPanel>
-            <TextBlock Grid.Column="4" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="{x:Bind VM.PendingMarkText, Mode=OneWay}" />
-        </Grid>
+        </StackPanel>
 
         <!-- Mark buttons + export -->
         <StackPanel Grid.Row="5" Grid.Column="0" Orientation="Horizontal" Spacing="8">

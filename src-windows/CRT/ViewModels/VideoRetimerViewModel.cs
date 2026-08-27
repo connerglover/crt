@@ -65,6 +65,20 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
     [ObservableProperty]
     private string _pendingMarkText = "";
 
+    /// <summary>Normal-play speed multiplier chosen from the speed picker.</summary>
+    [ObservableProperty]
+    private double _playbackRate = 1.0;
+
+    /// <summary>
+    /// Trick-play scan multiplier: 0 when off, positive fast-forward, negative
+    /// rewind. Shown next to the transport so the state is never ambiguous.
+    /// </summary>
+    [ObservableProperty]
+    private int _scanRate;
+
+    [ObservableProperty]
+    private string _scanText = "";
+
     private SessionViewModel Session => AppServices.Session;
 
     public decimal Fps => _videoInfo?.Fps is { } fps and > 0m ? fps : Session.Session.Framerate;
@@ -219,6 +233,68 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         return completed ? result : null;
     }
 
+    // ── Session binding ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Unloads the current video. Called when the session is replaced by a new
+    /// time: the marks are gone, so leaving the footage loaded would invite
+    /// marking a fresh run against the previous video.
+    /// </summary>
+    public void CloseVideo()
+    {
+        StopScan();
+        _reverseTimer?.Stop();
+        Player.Pause();
+        Player.Source = null;
+        _videoInfo = null;
+        HasVideo = false;
+        VideoPath = "";
+        ImportUrl = "";
+        VideoInfoText = "";
+        StatusText = "";
+        CurrentFrameText = "0";
+        CurrentTimeText = "00.000";
+        SliderMaxSeconds = 1;
+        SliderSeconds = 0;
+        IsPlaying = false;
+        _pendingLoadStart = null;
+        _pendingSegmentStart = null;
+        PendingMarkText = "";
+    }
+
+    /// <summary>
+    /// Reopens the video recorded in a run that has just been loaded, if it is
+    /// still where it was. A missing file is reported in the status line rather
+    /// than a dialog — the run itself opened fine, and the times are readable
+    /// without the footage.
+    /// </summary>
+    public async Task RestoreVideoForSessionAsync()
+    {
+        string path = Session.Session.Meta.VideoPath;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            CloseVideo();
+            return;
+        }
+        if (string.Equals(path, VideoPath, StringComparison.OrdinalIgnoreCase) && HasVideo)
+        {
+            return; // already open
+        }
+
+        CloseVideo();
+        if (!File.Exists(path))
+        {
+            StatusText = $"{AppServices.Loc["Video Missing"]} {Path.GetFileName(path)}";
+            return;
+        }
+
+        await LoadVideoAsync(path);
+        if (HasVideo)
+        {
+            AppServices.MainWindow?.ShowToast(AppServices.Loc["Video Reopened"]);
+        }
+    }
+
     private async Task LoadVideoAsync(string path)
     {
         StatusText = AppServices.Loc["Probing"];
@@ -261,6 +337,10 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
             _pendingSegmentStart = null;
             PendingMarkText = "";
             UpdatePosition();
+
+            // The video belongs to the run, so saving records it and reopening
+            // the run brings it back.
+            Session.Session.Meta.VideoPath = path;
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -306,16 +386,132 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         {
             return;
         }
+        StopScan();
         if (Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing)
         {
             Player.Pause();
         }
         else
         {
+            Player.PlaybackSession.PlaybackRate = PlaybackRate;
             Player.Play();
         }
         UpdatePosition();
     }
+
+    // ── Playback speed + trick play ────────────────────────────────────────
+
+    /// <summary>Speed multipliers offered by the picker.</summary>
+    public static IReadOnlyList<double> PlaybackRates { get; } =
+        new[] { 0.1, 0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 4.0 };
+
+    /// <summary>
+    /// Sets the normal-play speed. Slow motion is the useful direction here:
+    /// finding the exact frame a load ends is far easier at 0.1x than by
+    /// stepping, and the frame counter stays accurate at any rate because it is
+    /// derived from the clock rather than counted.
+    /// </summary>
+    public void SetPlaybackRate(double rate)
+    {
+        PlaybackRate = rate;
+        StopScan();
+        if (HasVideo)
+        {
+            Player.PlaybackSession.PlaybackRate = rate;
+        }
+    }
+
+    /// <summary>
+    /// Fast-forward. Repeated presses climb 2x, 4x, 8x, 16x then wrap, the way a
+    /// transport control is expected to behave; pressing the opposite direction
+    /// reverses instead of continuing to climb.
+    /// </summary>
+    [RelayCommand]
+    public void ScanForward() => Scan(ScanRate >= 0 ? NextScanStep(ScanRate) : 2);
+
+    /// <summary>Rewind, mirroring <see cref="ScanForward"/>.</summary>
+    [RelayCommand]
+    public void ScanBackward() => Scan(ScanRate <= 0 ? -NextScanStep(-ScanRate) : -2);
+
+    private static int NextScanStep(int current) => current switch
+    {
+        0 or 1 => 2,
+        2 => 4,
+        4 => 8,
+        8 => 16,
+        _ => 2,
+    };
+
+    private void Scan(int rate)
+    {
+        if (!HasVideo)
+        {
+            return;
+        }
+
+        ScanRate = rate;
+        ScanText = rate == 0 ? "" : (rate > 0 ? $"\u25b6\u25b6 {rate}x" : $"\u25c0\u25c0 {-rate}x");
+
+        if (rate > 0)
+        {
+            // Forward scan is real playback at speed, so audio/decode stay the
+            // player's problem.
+            _reverseTimer?.Stop();
+            Player.PlaybackSession.PlaybackRate = rate;
+            Player.Play();
+            return;
+        }
+
+        // MediaPlayer has no negative playback rate, so rewind is stepping the
+        // position backwards on a timer while the pipeline stays paused.
+        Player.Pause();
+        Player.PlaybackSession.PlaybackRate = PlaybackRate;
+        _reverseTimer ??= CreateReverseTimer();
+        _reverseTimer.Start();
+    }
+
+    /// <summary>Returns to normal speed. Any transport action cancels a scan.</summary>
+    public void StopScan()
+    {
+        if (ScanRate == 0)
+        {
+            return;
+        }
+        ScanRate = 0;
+        ScanText = "";
+        _reverseTimer?.Stop();
+        if (HasVideo)
+        {
+            Player.PlaybackSession.PlaybackRate = PlaybackRate;
+        }
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer CreateReverseTimer()
+    {
+        var timer = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(ReverseTickMs);
+        timer.Tick += (_, _) =>
+        {
+            if (ScanRate >= 0)
+            {
+                timer.Stop();
+                return;
+            }
+            decimal step = (decimal)(-ScanRate * ReverseTickMs) / 1000m;
+            decimal target = PositionSeconds - step;
+            if (target <= 0m)
+            {
+                SeekSeconds(0m);
+                StopScan();
+                return;
+            }
+            SeekSeconds(target);
+        };
+        return timer;
+    }
+
+    private const int ReverseTickMs = 100;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _reverseTimer;
 
     [RelayCommand]
     public void StepForward()
@@ -324,6 +520,7 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         {
             return;
         }
+        StopScan();
         Player.Pause();
         Player.StepForwardOneFrame();
         UpdatePosition();
@@ -336,6 +533,7 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         {
             return;
         }
+        StopScan();
         Player.Pause();
         Player.StepBackwardOneFrame();
         UpdatePosition();
@@ -348,6 +546,7 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         {
             return;
         }
+        StopScan();
         Player.Pause();
         decimal seconds = frames / Fps;
         SeekSeconds(PositionSeconds + seconds);
@@ -521,7 +720,12 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         var options = new TimerOverlayOptions(
             VideoHeight: _videoInfo.Height > 0 ? _videoInfo.Height : 1080,
             Corner: AppServices.Settings.TimerCorner,
-            Style: AppServices.Settings.TimerStyle);
+            Style: AppServices.Settings.TimerStyle)
+        {
+            ShowBothTimers = AppServices.Settings.DualTimer,
+            WithoutLoadsLabel = AppServices.Loc["Without Loads"],
+            WithLoadsLabel = AppServices.Loc["With Loads"],
+        };
         string chain = TimerFiltergraphBuilder.Build(runStart, runEnd, pauses, trimStart, options);
 
         var exporter = new FfmpegExporter(ffmpeg);

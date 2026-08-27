@@ -14,14 +14,17 @@ public static class SegmentMath
     /// </summary>
     public static (int StartFrame, int EndFrame, List<Load> Gaps) ToRunBoundsAndGaps(IReadOnlyList<Segment> segments)
     {
-        if (segments.Count == 0)
+        // Unfilled 0-0 rows are placeholders, not coverage: including one would
+        // anchor the run to frame zero and invent a gap spanning the whole run.
+        var filled = segments.Where(s => s.Length > 0).ToList();
+        if (filled.Count == 0)
         {
             return (0, 0, new List<Load>());
         }
 
-        var sorted = segments.OrderBy(s => s.StartFrame).ThenBy(s => s.EndFrame).ToList();
+        var sorted = filled.OrderBy(s => s.StartFrame).ThenBy(s => s.EndFrame).ToList();
         int startFrame = sorted[0].StartFrame;
-        int endFrame = segments.Max(s => s.EndFrame);
+        int endFrame = filled.Max(s => s.EndFrame);
 
         var gaps = new List<Load>();
         int coveredEnd = sorted[0].EndFrame;

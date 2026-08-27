@@ -11,6 +11,22 @@ public sealed record TimerOverlayOptions(
     string FontFile = TimerFiltergraphBuilder.DefaultWindowsFontFile)
 {
     public int FontSize => Math.Max(1, VideoHeight / 18);
+
+    /// <summary>Vertical advance between stacked timer lines.</summary>
+    public int LineHeight => (int)Math.Round(FontSize * 1.5);
+
+    /// <summary>
+    /// Draw the loadless clock and the real-time clock as two stacked lines
+    /// instead of one. Both are labelled, since two bare clocks side by side
+    /// are indistinguishable once burned into the video.
+    /// </summary>
+    public bool ShowBothTimers { get; init; }
+
+    /// <summary>Caption for the loadless clock. Supplied by the caller so it is localized.</summary>
+    public string WithoutLoadsLabel { get; init; } = "";
+
+    /// <summary>Caption for the real-time clock.</summary>
+    public string WithLoadsLabel { get; init; } = "";
 }
 
 /// <summary>
@@ -42,7 +58,32 @@ public static class TimerFiltergraphBuilder
         decimal trimStart,
         TimerOverlayOptions options)
     {
-        string prefix = FilterPrefix(options);
+        if (!options.ShowBothTimers)
+        {
+            return BuildTrack(runStart, runEnd, pauses, trimStart, options, "", 0, 1);
+        }
+
+        // The real-time clock is the same run window with nothing frozen, so the
+        // two tracks differ only in whether the pauses are applied.
+        string withoutLoads = BuildTrack(
+            runStart, runEnd, pauses, trimStart, options, options.WithoutLoadsLabel, 0, 2);
+        string withLoads = BuildTrack(
+            runStart, runEnd, Array.Empty<Pause>(), trimStart, options, options.WithLoadsLabel, 1, 2);
+        return withoutLoads + "," + withLoads;
+    }
+
+    private static string BuildTrack(
+        decimal runStart,
+        decimal runEnd,
+        IReadOnlyList<Pause> pauses,
+        decimal trimStart,
+        TimerOverlayOptions options,
+        string label,
+        int lineIndex,
+        int lineCount)
+    {
+        string prefix = FilterPrefix(options, lineIndex, lineCount);
+        string caption = label.Length == 0 ? "" : EscapeText(label) + " ";
         var filters = new List<string>();
 
         // Clamp pauses into the run window, drop empties, sort chronologically.
@@ -58,7 +99,7 @@ public static class TimerFiltergraphBuilder
         // Before the run: constant zero clock.
         if (runStartOut > 0m)
         {
-            filters.Add($"{prefix}:enable='lt(t,{Num(runStartOut)})':text='{ConstantClock(0m)}'");
+            filters.Add($"{prefix}:enable='lt(t,{Num(runStartOut)})':text='{caption}{ConstantClock(0m)}'");
         }
 
         // Alternating running / frozen windows.
@@ -68,26 +109,26 @@ public static class TimerFiltergraphBuilder
         {
             if (pause.Start > cursor)
             {
-                filters.Add(RunningWindow(prefix, cursor - trimStart, pause.Start - trimStart, runStartOut + accumulatedPause));
+                filters.Add(RunningWindow(prefix, caption, cursor - trimStart, pause.Start - trimStart, runStartOut + accumulatedPause));
             }
             decimal elapsedAtFreeze = pause.Start - runStart - accumulatedPause;
-            filters.Add($"{prefix}:enable='between(t,{Num(pause.Start - trimStart)},{Num(pause.End - trimStart)})':text='{ConstantClock(elapsedAtFreeze)}'");
+            filters.Add($"{prefix}:enable='between(t,{Num(pause.Start - trimStart)},{Num(pause.End - trimStart)})':text='{caption}{ConstantClock(elapsedAtFreeze)}'");
             accumulatedPause += pause.End - pause.Start;
             cursor = pause.End;
         }
         if (runEnd > cursor)
         {
-            filters.Add(RunningWindow(prefix, cursor - trimStart, runEndOut, runStartOut + accumulatedPause));
+            filters.Add(RunningWindow(prefix, caption, cursor - trimStart, runEndOut, runStartOut + accumulatedPause));
         }
 
         // After the run: the final time, held.
         decimal finalElapsed = runEnd - runStart - accumulatedPause;
-        filters.Add($"{prefix}:enable='gt(t,{Num(runEndOut)})':text='{ConstantClock(finalElapsed)}'");
+        filters.Add($"{prefix}:enable='gt(t,{Num(runEndOut)})':text='{caption}{ConstantClock(finalElapsed)}'");
 
         return string.Join(",", filters);
     }
 
-    private static string RunningWindow(string prefix, decimal from, decimal to, decimal offset)
+    private static string RunningWindow(string prefix, string caption, decimal from, decimal to, decimal offset)
     {
         string o = Num(offset);
         string text =
@@ -95,11 +136,11 @@ public static class TimerFiltergraphBuilder
             $"%{{eif\\:trunc(mod((t-{o})/60,60))\\:d\\:2}}\\:" +
             $"%{{eif\\:trunc(mod(t-{o},60))\\:d\\:2}}." +
             $"%{{eif\\:trunc(mod((t-{o})*1000,1000))\\:d\\:3}}";
-        return $"{prefix}:enable='between(t,{Num(from)},{Num(to)})':text='{text}'";
+        return $"{prefix}:enable='between(t,{Num(from)},{Num(to)})':text='{caption}{text}'";
     }
 
     /// <summary>Shared drawtext style options (font, colors, box, corner position).</summary>
-    private static string FilterPrefix(TimerOverlayOptions options)
+    private static string FilterPrefix(TimerOverlayOptions options, int lineIndex, int lineCount)
     {
         var sb = new StringBuilder("drawtext=fontfile='");
         sb.Append(EscapeColons(options.FontFile));
@@ -109,18 +150,29 @@ public static class TimerFiltergraphBuilder
         {
             sb.Append(":box=1:boxcolor=black@0.55:boxborderw=10");
         }
-        var (x, y) = CornerPosition(options.Corner);
+        var (x, y) = CornerPosition(options.Corner, lineIndex, lineCount, options.LineHeight);
         sb.Append(":x=").Append(x).Append(":y=").Append(y);
         return sb.ToString();
     }
 
-    private static (string X, string Y) CornerPosition(string corner) => corner.ToLowerInvariant() switch
+    /// <summary>
+    /// Places one timer line in the chosen corner. Lines stack downwards, and
+    /// bottom corners are offset upwards by the remaining lines so the block as
+    /// a whole still sits against the edge.
+    /// </summary>
+    private static (string X, string Y) CornerPosition(string corner, int lineIndex, int lineCount, int lineHeight)
     {
-        "top-left" => ("24", "24"),
-        "top-right" => ("w-tw-24", "24"),
-        "bottom-left" => ("24", "h-th-24"),
-        _ => ("w-tw-24", "h-th-24"), // bottom-right (default)
-    };
+        string normalized = corner.ToLowerInvariant();
+        bool top = normalized.StartsWith("top", StringComparison.Ordinal);
+        bool left = normalized.EndsWith("left", StringComparison.Ordinal);
+
+        string x = left ? "24" : "w-tw-24";
+        int offset = top ? lineIndex * lineHeight : (lineCount - 1 - lineIndex) * lineHeight;
+        string y = top
+            ? (24 + offset).ToString(CultureInfo.InvariantCulture)
+            : offset == 0 ? "h-th-24" : $"h-th-24-{offset.ToString(CultureInfo.InvariantCulture)}";
+        return (x, y);
+    }
 
     /// <summary>Formats elapsed seconds as a constant HH:MM:SS.mmm clock, colons filter-escaped.</summary>
     public static string ConstantClock(decimal elapsedSeconds)
@@ -142,4 +194,17 @@ public static class TimerFiltergraphBuilder
         value.ToString("0.######", CultureInfo.InvariantCulture);
 
     private static string EscapeColons(string text) => text.Replace(":", "\\:");
+
+    /// <summary>
+    /// Escapes caption text for a drawtext <c>text='...'</c> value. An
+    /// apostrophe would terminate the quoted value and there is no way to
+    /// reopen it inside a single argv entry, so it is dropped rather than
+    /// escaped — losing a punctuation mark beats producing a filtergraph
+    /// ffmpeg refuses to parse.
+    /// </summary>
+    private static string EscapeText(string text) => text
+        .Replace("\\", "\\\\")
+        .Replace("'", "")
+        .Replace(":", "\\:")
+        .Replace("%", "\\%");
 }

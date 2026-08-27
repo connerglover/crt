@@ -20,14 +20,27 @@ public sealed class AppSettings
     /// <summary>pill | plain.</summary>
     public string TimerStyle { get; set; } = "pill";
 
+    /// <summary>Burn both the loadless and real-time clocks into the export.</summary>
+    public bool DualTimer { get; set; }
+
     /// <summary>Explicit ffmpeg path; empty = auto-discover.</summary>
     public string FfmpegPath { get; set; } = "";
 
     /// <summary>Explicit yt-dlp path; empty = auto-discover.</summary>
     public string YtDlpPath { get; set; } = "";
 
-    /// <summary>loads | segments.</summary>
-    public string DefaultMode { get; set; } = "loads";
+    /// <summary>
+    /// segments | loads. Segment mode is the default; "loads" is the classic
+    /// start/end-plus-loads workflow, kept for runs timed that way.
+    /// </summary>
+    public string DefaultMode { get; set; } = "segments";
+
+    /// <summary>True when <see cref="DefaultMode"/> selects the classic workflow.</summary>
+    public bool ClassicMode
+    {
+        get => !string.Equals(DefaultMode, "segments", StringComparison.OrdinalIgnoreCase);
+        set => DefaultMode = value ? "loads" : "segments";
+    }
 
     /// <summary>Hotkey sequences keyed by action id.</summary>
     public Dictionary<string, string> Hotkeys { get; set; } = new();
@@ -41,6 +54,7 @@ public sealed class AppSettings
         ModNoteFormat = ModNoteFormat,
         TimerCorner = TimerCorner,
         TimerStyle = TimerStyle,
+        DualTimer = DualTimer,
         FfmpegPath = FfmpegPath,
         YtDlpPath = YtDlpPath,
         DefaultMode = DefaultMode,
@@ -55,6 +69,7 @@ public sealed class AppSettings
         ModNoteFormat == other.ModNoteFormat &&
         TimerCorner == other.TimerCorner &&
         TimerStyle == other.TimerStyle &&
+        DualTimer == other.DualTimer &&
         FfmpegPath == other.FfmpegPath &&
         YtDlpPath == other.YtDlpPath &&
         DefaultMode == other.DefaultMode &&

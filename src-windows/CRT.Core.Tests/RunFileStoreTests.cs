@@ -183,3 +183,39 @@ public class SegmentMathTests
         Assert.Empty(gaps);
     }
 }
+
+public class RunFileVideoBindingTests
+{
+    [Fact]
+    public void VideoPathRoundTrips()
+    {
+        var session = new TimeSession { StartFrame = 0, EndFrame = 600 };
+        session.Meta.VideoPath = @"C:\runs\attempt.mp4";
+        var reloaded = RunFileStore.Deserialize(RunFileStore.Serialize(session));
+        Assert.Equal(@"C:\runs\attempt.mp4", reloaded.Meta.VideoPath);
+    }
+
+    [Fact]
+    public void MissingVideoPathIsEmptyNotNull()
+    {
+        var reloaded = RunFileStore.Deserialize(
+            "{\"start_frame\": 0, \"end_frame\": 60, \"framerate\": \"60\", \"loads\": []}");
+        Assert.Equal("", reloaded.Meta.VideoPath);
+    }
+
+    // Segment mode is now the default for new sessions. A Python file has no
+    // "mode" key, and its start/end/loads only mean anything in classic mode,
+    // so it must not pick up the new default.
+    [Fact]
+    public void LegacyPythonFileStillOpensInClassicMode()
+    {
+        var reloaded = RunFileStore.Deserialize(
+            "{\"start_frame\": 100, \"end_frame\": 700, \"framerate\": \"60\", " +
+            "\"loads\": [[200, 300]]}");
+        Assert.Equal(TimingMode.Loads, reloaded.Mode);
+        Assert.Equal(100, reloaded.StartFrame);
+        Assert.Equal(700, reloaded.EndFrame);
+        Assert.Single(reloaded.Loads);
+        Assert.Equal(500, reloaded.LengthWithoutLoads);
+    }
+}

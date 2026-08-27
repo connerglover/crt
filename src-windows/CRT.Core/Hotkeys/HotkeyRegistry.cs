@@ -31,7 +31,7 @@ public static partial class HotkeyRegistry
         new("start_loads_paste", "Paste Start Frame (Loads)", "Ctrl+3"),
         new("end_loads_paste", "Paste End Frame (Loads)", "Ctrl+4"),
         new("Add Loads", "Add Load", "Ctrl+L"),
-        // New (native rewrite): video retimer + mode toggle.
+        // New (native rewrite): video retimer marking.
         new("video_frame_back", "Frame Back", ","),
         new("video_frame_forward", "Frame Forward", "."),
         new("video_play_pause", "Play/Pause", "Space"),
@@ -39,7 +39,6 @@ public static partial class HotkeyRegistry
         new("video_mark_end", "Mark Segment End", "]"),
         new("video_mark_load_start", "Mark Load Start", "L"),
         new("video_mark_load_end", "Mark Load End", "Shift+L"),
-        new("Toggle Mode", "Toggle Mode", "Ctrl+T"),
     };
 
     /// <summary>Actions surfaced as menu entries (shortcut is shown beside the item).</summary>
