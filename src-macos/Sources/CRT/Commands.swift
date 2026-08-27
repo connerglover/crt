@@ -2,9 +2,24 @@ import AppKit
 import SwiftUI
 import CRTCore
 
+/// Reads main-actor state from a non-isolated context.
+///
+/// `View.body` is `@MainActor`, but `Commands.body` — and the free functions a
+/// command body calls — are not, so touching `AppModel.shared` here is rejected
+/// (a warning under Swift 5, a hard error under Swift 6). Note that it is the
+/// static `shared` property itself that is isolated: reading an immutable
+/// `Sendable` value such as `loc` off it does not exempt the access.
+///
+/// SwiftUI always evaluates command bodies on the main thread, so asserting the
+/// isolation is sound — and it keeps the menu declarative instead of
+/// restructuring every item around an async hop, which a menu cannot wait for.
+private func mainState<T: Sendable>(_ read: @MainActor () -> T) -> T {
+    MainActor.assumeIsolated(read)
+}
+
 /// Maps a stored key combination onto a SwiftUI menu shortcut.
 func menuShortcut(for actionID: String) -> KeyboardShortcut? {
-    let stored = AppModel.shared.settings.hotkey(for: actionID)
+    let stored = mainState({ AppModel.shared.settings.hotkey(for: actionID) })
     guard let combo = KeyCombo(string: stored) else { return nil }
 
     var modifiers: EventModifiers = []
@@ -44,26 +59,11 @@ func menuShortcut(for actionID: String) -> KeyboardShortcut? {
     return KeyboardShortcut(key, modifiers: modifiers)
 }
 
-/// Reads main-actor state from inside a `Commands` body.
-///
-/// `View.body` is `@MainActor`, but `Commands.body` is not, so synchronously
-/// reading an isolated model property here (a menu item's enabled state, a
-/// toggle's value) is rejected outright. SwiftUI always evaluates command
-/// bodies on the main thread, so asserting that isolation is sound — and it
-/// keeps the menu declarative instead of restructuring every item around an
-/// async hop, which a menu cannot wait for anyway.
-///
-/// Immutable `let` state (`loc`, `settings`) needs none of this: Swift already
-/// permits cross-actor reads of immutable Sendable values.
-private func mainState<T>(_ read: @MainActor () -> T) -> T {
-    MainActor.assumeIsolated(read)
-}
-
 /// Native menu bar (spec §6). Actions hop to the main actor explicitly since
 /// command closures are not statically isolated.
 struct CRTCommands: Commands {
 
-    private var loc: Localization { AppModel.shared.loc }
+    private var loc: Localization { mainState({ AppModel.shared.loc }) }
 
     var body: some Commands {
         // File
