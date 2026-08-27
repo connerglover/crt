@@ -1,5 +1,6 @@
 # Standard library
 import json
+from decimal import Decimal as d, InvalidOperation
 from typing import NoReturn, Optional
 
 # Local application
@@ -29,6 +30,21 @@ class FileManager:
         if path and path != self.file_path and path not in self.past_file_paths:
             self.past_file_paths.append(path)
 
+    @staticmethod
+    def _parse_framerate(value) -> d:
+        """Converts a stored framerate back into a Decimal.
+
+        to_dict() writes the framerate as a string, so loading it back
+        unconverted left a str on Time.framerate — which then blew up in
+        Time.with_loads' int(self.framerate) for any fractional rate
+        (29.97, 59.94, 23.976 …), making saved runs at those framerates
+        impossible to reopen.
+        """
+        try:
+            return d(str(value))
+        except (InvalidOperation, ValueError):
+            raise ValueError("The file provided is corrupted.")
+
     def to_dict(self) -> dict:
         """Converts the current time to a JSON-serializable dictionary."""
         return {
@@ -51,7 +67,7 @@ class FileManager:
         self.time.mutate(
             start_frame=file_data["start_frame"],
             end_frame=file_data["end_frame"],
-            framerate=file_data["framerate"]
+            framerate=self._parse_framerate(file_data["framerate"])
         )
         self.time.loads = [Load(load[0], load[1]) for load in file_data["loads"]]
 
