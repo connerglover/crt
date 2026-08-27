@@ -35,11 +35,19 @@ final class TimeSessionTests: XCTestCase {
         XCTAssertEqual(session.withoutLoads, Decimal(0))
     }
 
-    /// Python quirk: with_loads guards `int(framerate) == 0` (truncating).
-    func testSubOneFramerateQuirk() {
+    /// A sub-one framerate is handled consistently — deliberately unlike Python.
+    ///
+    /// The original guards the two totals differently: `with_loads` tests
+    /// `int(self.framerate) == 0`, which truncates 0.5 to 0 and returns a time
+    /// of 0, while `without_loads` tests `self.framerate == 0` and returns
+    /// 200.000. The same session therefore reports two contradictory totals.
+    /// That is a bug, not behavior worth porting, and the Windows build already
+    /// returns 200 for both — the two native apps agreeing with each other
+    /// matters more than either reproducing a Python edge-case defect.
+    func testSubOneFramerateIsConsistent() {
         let session = TimeSession(startFrame: 0, endFrame: 100,
                                   framerate: Decimal(string: "0.5") ?? Decimal(0))
-        XCTAssertEqual(session.withLoads, Decimal(0))
+        XCTAssertEqual(session.withLoads, Decimal(200))
         XCTAssertEqual(session.withoutLoads, Decimal(200))
     }
 

@@ -68,9 +68,19 @@ final class TimeFormatterTests: XCTestCase {
 
     // MARK: - Rounding
 
-    func testRoundedHalfAwayFromZero() {
-        XCTAssertEqual(TimeFormatter.rounded(dec("1.2345"), scale: 3), dec("1.235"))
-        XCTAssertEqual(TimeFormatter.roundedToInt(dec("2.5")), 3)
+    /// Midpoints round half-to-even, not half-away-from-zero.
+    ///
+    /// This is not a style choice: Python's decimal context defaults to
+    /// ROUND_HALF_EVEN, so `round(Decimal("1.2345"), 3)` is 1.234 and
+    /// `round(Decimal("2.5"))` is 2 in the original app. The Windows port
+    /// spells the same thing as `MidpointRounding.ToEven`. All three
+    /// implementations have to agree on midpoints or the same run yields
+    /// different mod notes depending on which app timed it.
+    func testRoundedHalfToEven() {
+        XCTAssertEqual(TimeFormatter.rounded(dec("1.2345"), scale: 3), dec("1.234"))
+        XCTAssertEqual(TimeFormatter.rounded(dec("1.2355"), scale: 3), dec("1.236"))
+        XCTAssertEqual(TimeFormatter.roundedToInt(dec("2.5")), 2)
+        XCTAssertEqual(TimeFormatter.roundedToInt(dec("3.5")), 4)
         XCTAssertEqual(TimeFormatter.roundedToInt(dec("2.4")), 2)
     }
 
