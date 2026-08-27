@@ -223,6 +223,10 @@ ENV/
 *.suo
 *.binlog
 msbuild.log
+# The PyInstaller "*.manifest" rule further up would otherwise swallow the WinUI
+# app manifest, which CRT.csproj references via <ApplicationManifest> — without
+# it a fresh clone does not build.
+!src-windows/CRT/app.manifest
 
 ### Swift / SwiftPM (src-macos) ###
 .build/
