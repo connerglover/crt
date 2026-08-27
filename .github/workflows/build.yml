@@ -2,152 +2,55 @@ name: Build and Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/macos-swiftui"]
     tags: ["[0-9]+.[0-9]+.[0-9]+*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build executable
-        working-directory: src
-        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --name crt-windows main.py
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: crt-windows
-          path: src/dist/crt-windows.exe
-          compression-level: 0
-
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: "pip"
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller pillow
+      - name: Show toolchain
+        run: swift --version
 
-      - name: Generate .icns icon
-        working-directory: src
-        run: |
-          python - <<'PY'
-          import os
-          from PIL import Image
+      - name: Build
+        working-directory: src-macos
+        run: swift build -c release
 
-          im = Image.open("icon.ico").convert("RGBA")
-          os.makedirs("crt.iconset", exist_ok=True)
-          for size in (16, 32, 128, 256, 512):
-              im.resize((size, size), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}.png")
-              im.resize((size * 2, size * 2), Image.LANCZOS).save(f"crt.iconset/icon_{size}x{size}@2x.png")
-          PY
-          iconutil -c icns crt.iconset -o icon.icns
+      - name: Test
+        working-directory: src-macos
+        run: swift test
 
-      - name: Build .app bundle
-        working-directory: src
-        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.icns --add-data "icon.ico:." --name crt main.py
+      # Assembles build/CRT.app (Info.plist, AppIcon.icns from Resources/icon.ico,
+      # ad-hoc signature). Icon generation and signing are best effort.
+      - name: Bundle CRT.app
+        working-directory: src-macos
+        run: bash Scripts/make-app.sh
 
-      - name: Build .dmg
-        working-directory: src
-        run: hdiutil create -volname CRT -srcfolder dist/crt.app -ov -format UDZO ../crt-macos.dmg
+      - name: Package .dmg
+        working-directory: src-macos
+        run: hdiutil create -volname CRT -srcfolder build/CRT.app -ov -format UDZO crt-macos.dmg
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: crt-macos
-          path: crt-macos.dmg
-          compression-level: 0
-
-  build-linux:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller pillow
-
-      - name: Build executable
-        working-directory: src
-        run: pyinstaller --noconfirm --onefile --name crt main.py
-
-      - name: Generate icon
-        working-directory: src
-        run: python -c "from PIL import Image; Image.open('icon.ico').convert('RGBA').save('icon.png')"
-
-      - name: Assemble AppDir
-        working-directory: src
-        run: |
-          mkdir -p crt.AppDir/usr/bin
-          cp dist/crt crt.AppDir/usr/bin/crt
-          cp icon.png crt.AppDir/crt.png
-          cat > crt.AppDir/crt.desktop <<EOF
-          [Desktop Entry]
-          Type=Application
-          Name=CRT
-          Exec=crt
-          Icon=crt
-          Categories=Utility;
-          EOF
-          ln -s usr/bin/crt crt.AppDir/AppRun
-
-      - name: Download appimagetool
-        working-directory: src
-        run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
-          chmod +x appimagetool
-
-      - name: Build AppImage
-        working-directory: src
-        run: ./appimagetool --appimage-extract-and-run crt.AppDir crt-linux.AppImage
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: crt-linux
-          path: src/crt-linux.AppImage
+          path: src-macos/crt-macos.dmg
           compression-level: 0
 
   release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-macos]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 

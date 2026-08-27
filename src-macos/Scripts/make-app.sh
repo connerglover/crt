@@ -26,8 +26,9 @@ APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
 CONTENTS_DIR="${APP_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
-# Shared with the Windows build: repo-root src/icon.ico.
-ICON_SOURCE="${PACKAGE_ROOT}/../src/icon.ico"
+# Lives inside the package so this branch carries no dependency on the Python
+# app's tree (the icon used to be read from the repo root's src/icon.ico).
+ICON_SOURCE="${PACKAGE_ROOT}/Resources/icon.ico"
 
 # --- Output helpers ----------------------------------------------------------
 
@@ -101,7 +102,7 @@ printf 'APPL????' > "${CONTENTS_DIR}/PkgInfo"
 
 # --- Icon (best effort) ------------------------------------------------------
 
-# Converts src/icon.ico into Contents/Resources/AppIcon.icns using sips +
+# Converts Resources/icon.ico into Contents/Resources/AppIcon.icns using sips +
 # iconutil. Always returns 0: a missing icon must never fail the build.
 make_icon() {
     if [ ! -f "${ICON_SOURCE}" ]; then
@@ -156,7 +157,7 @@ make_icon() {
     done
 
     if [ "${icon_ok}" -eq 1 ] && iconutil -c icns "${iconset_dir}" -o "${RESOURCES_DIR}/AppIcon.icns" >/dev/null 2>&1; then
-        info "Generated Resources/AppIcon.icns from src/icon.ico."
+        info "Generated Resources/AppIcon.icns from Resources/icon.ico."
     else
         warn "could not generate AppIcon.icns — the app will use the default icon."
     fi

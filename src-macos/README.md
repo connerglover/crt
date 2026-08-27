@@ -7,8 +7,8 @@ into submissions.
 
 This directory is the native macOS rewrite — a Swift 5.9 / SwiftUI app built as
 a Swift package. It is version **2.0.0**, feature-matched with the Windows
-rewrite in `../src-windows/` and behavior-matched with the original Python app
-in `../src/crt/`.
+rewrite on the `feat/windows-winui3` branch and behavior-matched with the
+original Python app on `main` (`src/crt/`), which this branch does not carry.
 
 The package has three targets:
 
@@ -55,7 +55,7 @@ make clean      # swift package clean + rm -rf build
 `make app` runs `Scripts/make-app.sh`, which assembles a real application
 bundle at `build/CRT.app`: the release binary in `Contents/MacOS/CRT`, an
 `Info.plist` (bundle id `com.connerglover.crt`, version 2.0.0, minimum system
-version 14.0), an `AppIcon.icns` generated from `../src/icon.ico` with `sips`
+version 14.0), an `AppIcon.icns` generated from `Resources/icon.ico` with `sips`
 and `iconutil`, and an ad-hoc code signature. Icon generation and signing are
 best effort — if `sips`, `iconutil` or `codesign` is unavailable the script
 warns and still produces a working bundle. Use the bundle rather than

@@ -22,7 +22,8 @@ CRT is maintained by a single volunteer maintainer, so response times are best-e
 
 CRT is an offline desktop tool with no network features beyond an optional check against the GitHub Releases API for updates. Relevant reports include (but aren't limited to):
 
-- Vulnerable dependencies (see [requirements.txt](requirements.txt))
+- Vulnerable dependencies (see the package manifest,
+  [`src-macos/Package.swift`](src-macos/Package.swift))
 - Unsafe file parsing (session/time files, settings)
 - Issues in the update-check flow
 
