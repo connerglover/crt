@@ -45,6 +45,8 @@ public sealed partial class SettingsPage : Page
         TimerLookHeader.Text = loc["Appearance"];
         TimerFontLabel.Text = loc["Font"];
         TimerSizeLabel.Text = loc["Text Size"];
+        TimerSpacingLabel.Text = loc["Line Spacing"];
+        PreviewTimerButton.Content = loc["Preview Timer"];
         TimerTextColorLabel.Text = loc["Text Color"];
         TimerBackgroundCheck.Content = loc["Timer Background"];
         TimerBackgroundColorLabel.Text = loc["Background Color"];

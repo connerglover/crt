@@ -34,10 +34,16 @@ public sealed record TimerOverlayOptions(int VideoHeight)
 
     public int BackgroundOpacity { get; init; } = 55;
 
+    /// <summary>
+    /// Vertical advance between stacked lines, as a multiple of the text size.
+    /// 1.0 sets the lines flush against each other.
+    /// </summary>
+    public double LineSpacing { get; init; } = 1.2;
+
     public int FontSize => Math.Max(1, (int)Math.Round(VideoHeight * TextSizePercent / 100.0));
 
-    /// <summary>Vertical advance between stacked lines.</summary>
-    public int LineHeight => (int)Math.Round(FontSize * 1.5);
+    /// <summary>Vertical advance between stacked lines, in pixels.</summary>
+    public int LineHeight => Math.Max(1, (int)Math.Round(FontSize * LineSpacing));
 
     public string FontFile => TimerFontCatalog.ResolveFile(FontFamily, Bold);
 }
@@ -115,8 +121,20 @@ public static partial class TimerFiltergraphBuilder
 
         // Units are chosen from the totals the run reaches, so a Fitted clock
         // keeps one width for the whole video.
+        //
+        // Both clocks are measured against the larger of the two totals rather
+        // than their own. A run whose loadless time stays under a minute while
+        // its real time passes one would otherwise render "50.000" stacked above
+        // "1:10.000" — two clocks in visibly different formats, which reads as
+        // the style being broken rather than as a deliberate fit.
         decimal loadlessTotal = windows[^1].Loadless.Frozen;
         decimal realTimeTotal = windows[^1].RealTime.Frozen;
+        if (options.ClockStyle == TimerClockStyle.Fitted)
+        {
+            decimal shared = Math.Max(loadlessTotal, realTimeTotal);
+            loadlessTotal = shared;
+            realTimeTotal = shared;
+        }
 
         var filters = new List<string>();
         int lineIndex = 0;

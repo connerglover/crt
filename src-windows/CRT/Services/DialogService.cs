@@ -40,6 +40,60 @@ public sealed class DialogService
         await ShowAsync(title, message, AppServices.Loc["OK"], null, null);
     }
 
+    /// <summary>
+    /// Shows a rendered image with a caption, used for the timer preview.
+    /// </summary>
+    /// <remarks>
+    /// The bitmap is decoded with <c>BitmapCreateOptions.IgnoreImageCache</c>
+    /// because the preview is rewritten to the same path each time; without it
+    /// the second preview would show the first one's image.
+    /// </remarks>
+    public async Task ShowImageAsync(string title, string imagePath, string caption)
+    {
+        if (Root is null)
+        {
+            return;
+        }
+
+        await _gate.WaitAsync();
+        try
+        {
+            var source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage
+            {
+                CreateOptions = Microsoft.UI.Xaml.Media.Imaging.BitmapCreateOptions.IgnoreImageCache,
+                UriSource = new Uri(imagePath),
+            };
+            var panel = new StackPanel { Spacing = 10 };
+            panel.Children.Add(new Image
+            {
+                Source = source,
+                Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
+                MaxWidth = 900,
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = caption,
+                Opacity = 0.7,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+            });
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Root,
+                Title = title,
+                Content = panel,
+                CloseButtonText = AppServices.Loc["OK"],
+                RequestedTheme = (Root.Content as FrameworkElement)?.RequestedTheme ?? ElementTheme.Default,
+            };
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<bool> ConfirmAsync(string title, string message, string? yesText = null, string? noText = null)
     {
         var result = await ShowAsync(

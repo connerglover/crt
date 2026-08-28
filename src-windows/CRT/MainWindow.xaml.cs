@@ -83,7 +83,7 @@ public sealed partial class MainWindow : Window
     /// </remarks>
     private static (int Width, int Height) PageSize(string tag) => tag switch
     {
-        "retimer" => (880, 620),
+        "retimer" => (760, 620),
         "video" => (1120, 730),
         "settings" => (900, 680),
         _ => (940, 620),
@@ -133,8 +133,63 @@ public sealed partial class MainWindow : Window
         {
             return;
         }
-        _expectedSize = target;
-        AppWindow.Resize(target);
+        AnimateResize(target);
+    }
+
+    private const int ResizeDurationMs = 160;
+    private const int ResizeFrameMs = 10;
+
+    /// <summary>Trailing events arrive after the last step, so the guard outlasts it.</summary>
+    private const int ResizeSettleMs = 250;
+
+    private DispatcherQueueTimer? _resizeTimer;
+    private DispatcherQueueTimer? _settleTimer;
+    private bool _animatingResize;
+
+    /// <summary>
+    /// Eases the window to <paramref name="target"/> rather than snapping.
+    /// </summary>
+    /// <remarks>
+    /// A window jumping to a new size between pages reads as a glitch. There is
+    /// no built-in animation for the window frame, so this steps AppWindow.Resize
+    /// on a timer with an ease-out curve. Each step records its own expected size
+    /// so the "user resized it by hand" detector does not mistake the animation
+    /// for the user.
+    /// </remarks>
+    private void AnimateResize(Windows.Graphics.SizeInt32 target)
+    {
+        var from = AppWindow.Size;
+        _animatingResize = true;
+        _resizeTimer ??= DispatcherQueue.CreateTimer();
+        _resizeTimer.Stop();
+        _resizeTimer.Interval = TimeSpan.FromMilliseconds(ResizeFrameMs);
+
+        int elapsed = 0;
+        _resizeTimer.Tick -= OnResizeTick;
+        _resizeTimer.Tick += OnResizeTick;
+        _resizeTimer.Start();
+
+        void OnResizeTick(DispatcherQueueTimer sender, object args)
+        {
+            elapsed += ResizeFrameMs;
+            double t = Math.Clamp((double)elapsed / ResizeDurationMs, 0, 1);
+            // Cubic ease-out: quick to start, settles gently.
+            double eased = 1 - Math.Pow(1 - t, 3);
+
+            var step = new Windows.Graphics.SizeInt32(
+                (int)Math.Round(from.Width + (target.Width - from.Width) * eased),
+                (int)Math.Round(from.Height + (target.Height - from.Height) * eased));
+
+            _expectedSize = step;
+            AppWindow.Resize(step);
+
+            if (t >= 1)
+            {
+                sender.Stop();
+                sender.Tick -= OnResizeTick;
+                ReleaseResizeGuardAfterSettle();
+            }
+        }
     }
 
     /// <summary>
@@ -143,7 +198,12 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
     {
-        if (!args.DidSizeChange || _userResized)
+        // Size-change notifications lag behind the rapid Resize calls the
+        // animation makes, so during one they routinely report a size that no
+        // longer matches the step in flight. Comparing them would read the
+        // animation as a manual resize and permanently disable per-page sizing,
+        // which is exactly what happened before this guard.
+        if (!args.DidSizeChange || _userResized || _animatingResize)
         {
             return;
         }
@@ -186,6 +246,25 @@ public sealed partial class MainWindow : Window
     /// the only hook the framework exposes for it; it is applied to the root so
     /// the whole tree is covered in one pass.
     /// </remarks>
+    /// <summary>
+    /// Drops the animation guard once the trailing size events have drained, so
+    /// a genuine resize straight after a page change is still noticed.
+    /// </summary>
+    private void ReleaseResizeGuardAfterSettle()
+    {
+        _settleTimer ??= DispatcherQueue.CreateTimer();
+        _settleTimer.Stop();
+        _settleTimer.Interval = TimeSpan.FromMilliseconds(ResizeSettleMs);
+        _settleTimer.IsRepeating = false;
+        void OnSettle(DispatcherQueueTimer sender, object args)
+        {
+            sender.Tick -= OnSettle;
+            _animatingResize = false;
+        }
+        _settleTimer.Tick += OnSettle;
+        _settleTimer.Start();
+    }
+
     /// <summary>True when the given theme (or the current one) renders dark.</summary>
     private bool IsDarkTheme(ElementTheme? theme = null) => (theme ?? RootGrid.RequestedTheme) switch
     {
@@ -272,6 +351,24 @@ public sealed partial class MainWindow : Window
             Nav.SelectedItem = target;
         }
     }
+
+    /// <summary>
+    /// Gives the pane a solid background while it is open.
+    /// </summary>
+    /// <remarks>
+    /// In LeftCompact the hamburger opens the pane as an overlay across the
+    /// content, and the compact rail and that overlay share one resource key —
+    /// so the transparency that lets Mica through the rail also made the open
+    /// menu unreadable over whatever it covered. The brush is mutated in place
+    /// rather than swapped, so the change reaches the live template.
+    /// </remarks>
+    private void OnPaneOpening(NavigationView sender, object args) =>
+        PaneBackgroundBrush.Color = IsDarkTheme()
+            ? Windows.UI.Color.FromArgb(255, 43, 43, 43)
+            : Windows.UI.Color.FromArgb(255, 249, 249, 249);
+
+    private void OnPaneClosed(NavigationView sender, object args) =>
+        PaneBackgroundBrush.Color = Microsoft.UI.Colors.Transparent;
 
     private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {

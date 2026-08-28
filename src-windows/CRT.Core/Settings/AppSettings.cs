@@ -34,6 +34,9 @@ public sealed class AppSettings
     /// <summary>Text height as a percentage of the video height.</summary>
     public double TimerTextSize { get; set; } = 5.5;
 
+    /// <summary>Gap between stacked timer lines, as a multiple of the text size.</summary>
+    public double TimerLineSpacing { get; set; } = 1.2;
+
     public string TimerTextColor { get; set; } = "#ffffff";
 
     public bool TimerBackground { get; set; } = true;
@@ -77,6 +80,7 @@ public sealed class AppSettings
         TimerFontFamily = TimerFontFamily,
         TimerBold = TimerBold,
         TimerTextSize = TimerTextSize,
+        TimerLineSpacing = TimerLineSpacing,
         TimerTextColor = TimerTextColor,
         TimerBackground = TimerBackground,
         TimerBackgroundColor = TimerBackgroundColor,
@@ -99,6 +103,7 @@ public sealed class AppSettings
         TimerFontFamily == other.TimerFontFamily &&
         TimerBold == other.TimerBold &&
         TimerTextSize == other.TimerTextSize &&
+        TimerLineSpacing == other.TimerLineSpacing &&
         TimerTextColor == other.TimerTextColor &&
         TimerBackground == other.TimerBackground &&
         TimerBackgroundColor == other.TimerBackgroundColor &&

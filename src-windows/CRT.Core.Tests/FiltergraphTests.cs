@@ -216,7 +216,7 @@ public class TimerFormatTests
     {
         string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
             Options("{time_without_loads}\n{time_with_loads}"));
-        Assert.Contains(":y=h-th-24-88:", chain); // upper line, one line-height up
+        Assert.Contains(":y=h-th-24-71:", chain); // upper line, one line-height up (59 * 1.2)
         Assert.Contains(":y=h-th-24:", chain);    // lower line, on the edge
     }
 
@@ -365,5 +365,99 @@ public class FfmpegExporterTests
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
         }, args);
+    }
+}
+
+public class TimerLineSpacingTests
+{
+    private static string Chain(double spacing) =>
+        TimerFiltergraphBuilder.Build(1m, 5m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m,
+            new TimerOverlayOptions(VideoHeight: 1080)
+            {
+                Format = "{time_without_loads}\n{time_with_loads}",
+                LineSpacing = spacing,
+            });
+
+    [Fact]
+    public void TighterSpacingMovesTheUpperLineDown()
+    {
+        // Font is 59px at 1080p, so the offset is that times the spacing.
+        Assert.Contains(":y=h-th-24-59:", Chain(1.0));   // flush
+        Assert.Contains(":y=h-th-24-71:", Chain(1.2));   // default
+        Assert.Contains(":y=h-th-24-88:", Chain(1.5));   // the old fixed value (88.5 rounds to even)
+    }
+
+    [Fact]
+    public void SpacingIsIrrelevantToASingleLine()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m,
+            new TimerOverlayOptions(VideoHeight: 1080) { LineSpacing = 2.5 });
+        Assert.DoesNotContain("h-th-24-", chain);
+    }
+}
+
+public class FittedSharedUnitTests
+{
+    // A run whose loadless time stays under a minute while its real time passes
+    // one. Rendering "50.000" stacked above "1:10.000" reads as the style being
+    // broken, so Fitted measures both clocks against the larger total.
+    private static string Chain(TimerClockStyle style) =>
+        TimerFiltergraphBuilder.Build(0m, 70m,
+            new[] { new TimerFiltergraphBuilder.Pause(10m, 30m) }, 0m,
+            new TimerOverlayOptions(VideoHeight: 1080)
+            {
+                Format = "{time_without_loads}\n{time_with_loads}",
+                ClockStyle = style,
+            });
+
+    [Fact]
+    public void BothClocksShareTheSameUnit()
+    {
+        string chain = Chain(TimerClockStyle.Fitted);
+        Assert.Contains(@"0\:50.000", chain);   // loadless final, now carrying minutes
+        Assert.Contains(@"1\:10.000", chain);   // real-time final
+        Assert.DoesNotContain("text='50.000'", chain);
+    }
+
+    [Fact]
+    public void CompactStillSizesEachClockToItself()
+    {
+        // Compact is defined as "only the units needed", so its two clocks are
+        // allowed to differ; only Fitted promises a single width.
+        string chain = Chain(TimerClockStyle.Compact);
+        Assert.Contains("text='50.000'", chain);
+    }
+}
+
+public class TimerPreviewRendererTests
+{
+    [Fact]
+    public void ArgumentsRenderBothBackgroundsSideBySide()
+    {
+        var options = new TimerOverlayOptions(TimerPreviewRenderer.PaneHeight);
+        string chain = TimerPreviewRenderer.BuildChain(options);
+        string[] args = TimerPreviewRenderer.BuildArguments(chain, "out.png");
+
+        Assert.Contains("color=c=black:s=640x360:d=96:r=1", args);
+        Assert.Contains("color=c=white:s=640x360:d=96:r=1", args);
+        Assert.Contains(args, a => a.Contains("hstack=inputs=2"));
+        Assert.Equal("out.png", args[^1]);
+    }
+
+    [Fact]
+    public void PreviewScenarioShowsTheTwoClocksDiffering()
+    {
+        // The clocks are live expressions, so the sampled values (1:20 loadless
+        // against 1:35 real time) only exist once ffmpeg renders. What the chain
+        // can be checked for is the scenario that makes them differ: a load, and
+        // two finals fifteen seconds apart.
+        var options = new TimerOverlayOptions(TimerPreviewRenderer.PaneHeight)
+        {
+            Format = "{time_without_loads}\n{time_with_loads}",
+        };
+        string chain = TimerPreviewRenderer.BuildChain(options);
+        Assert.Contains("between(t,10,25)", chain);   // the load freezes one clock
+        Assert.Contains(@"4\:45.000", chain);          // loadless final
+        Assert.Contains(@"5\:00.000", chain);          // real-time final
     }
 }

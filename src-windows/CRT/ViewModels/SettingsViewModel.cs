@@ -87,6 +87,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     private double _timerTextSize = 5.5;
 
     [ObservableProperty]
+    private double _timerLineSpacing = 1.2;
+
+    [ObservableProperty]
     private string _timerTextColor = "#ffffff";
 
     [ObservableProperty]
@@ -110,6 +113,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string TimerTextSizeText => TimerTextSize.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     public string TimerBackgroundOpacityText => TimerBackgroundOpacity + "%";
+
+    public string TimerLineSpacingText =>
+        TimerLineSpacing.ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture) + "x";
+
+    partial void OnTimerLineSpacingChanged(double value) => OnPropertyChanged(nameof(TimerLineSpacingText));
 
     partial void OnTimerTextSizeChanged(double value) => OnPropertyChanged(nameof(TimerTextSizeText));
 
@@ -197,6 +205,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         TimerFontIndex = Math.Max(0, TimerFontCatalog.Families.ToList().IndexOf(settings.TimerFontFamily));
         TimerWeightIndex = settings.TimerBold ? 1 : 0;
         TimerTextSize = settings.TimerTextSize;
+        TimerLineSpacing = settings.TimerLineSpacing;
         TimerTextColor = settings.TimerTextColor;
         TimerBackground = settings.TimerBackground;
         TimerBackgroundColor = settings.TimerBackgroundColor;
@@ -228,6 +237,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Math.Clamp(TimerFontIndex, 0, TimerFontCatalog.Families.Count - 1)];
         settings.TimerBold = TimerWeightIndex == 1;
         settings.TimerTextSize = TimerTextSize;
+        settings.TimerLineSpacing = TimerLineSpacing;
         settings.TimerTextColor = TimerTextColor;
         settings.TimerBackground = TimerBackground;
         settings.TimerBackgroundColor = TimerBackgroundColor;
@@ -269,6 +279,86 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             AppServices.MainWindow?.ShowToast(AppServices.Loc["Settings applied"]);
         }
+    }
+
+    /// <summary>
+    /// Renders the timer as currently configured onto black and white and shows
+    /// the result.
+    /// </summary>
+    /// <remarks>
+    /// Built from the edited values rather than the saved ones, so the preview
+    /// answers "what will this look like" before committing to Apply.
+    /// </remarks>
+    [RelayCommand]
+    private async Task PreviewTimerAsync()
+    {
+        string? ffmpeg = await AppServices.VideoRetimer.EnsureToolAsync(ToolKind.Ffmpeg);
+        if (ffmpeg is null)
+        {
+            return;
+        }
+
+        var options = new TimerOverlayOptions(TimerPreviewRenderer.PaneHeight)
+        {
+            Format = TimerFormat,
+            ClockStyle = ClockStyleIndex switch
+            {
+                0 => Core.Tools.TimerClockStyle.Compact,
+                2 => Core.Tools.TimerClockStyle.Full,
+                _ => Core.Tools.TimerClockStyle.Fitted,
+            },
+            Corner = TimerCornerIndex switch
+            {
+                0 => "top-left",
+                1 => "top-right",
+                2 => "bottom-left",
+                _ => "bottom-right",
+            },
+            FontFamily = TimerFontCatalog.Families[
+                Math.Clamp(TimerFontIndex, 0, TimerFontCatalog.Families.Count - 1)],
+            Bold = TimerWeightIndex == 1,
+            TextSizePercent = TimerTextSize,
+            LineSpacing = TimerLineSpacing,
+            TextColor = TimerTextColor,
+            Background = TimerBackground,
+            BackgroundColor = TimerBackgroundColor,
+            BackgroundOpacity = TimerBackgroundOpacity,
+        };
+
+        string output = Path.Combine(AppServices.Paths.BaseDirectory, "timer-preview.png");
+        string chain = TimerPreviewRenderer.BuildChain(options);
+
+        AppServices.MainWindow?.SetBusy(true);
+        Core.Tools.ProcessResult result;
+        try
+        {
+            result = await Core.Tools.ProcessRunner.RunAsync(
+                ffmpeg, TimerPreviewRenderer.BuildArguments(chain, output));
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            await AppServices.Dialogs.ShowErrorAsync(e.Message);
+            return;
+        }
+        finally
+        {
+            AppServices.MainWindow?.SetBusy(false);
+        }
+
+        if (result.ExitCode != 0 || !File.Exists(output))
+        {
+            // ffmpeg reports a rejected filtergraph on stderr; the last line is
+            // the useful part, and the whole log would not fit a dialog.
+            string detail = result.StandardError
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .LastOrDefault()?.Trim() ?? "";
+            await AppServices.Dialogs.ShowErrorAsync(
+                AppServices.Loc["Preview Failed"] + (detail.Length > 0 ? "\n\n" + detail : ""));
+            return;
+        }
+
+        await AppServices.Dialogs.ShowImageAsync(
+            AppServices.Loc["Timer Preview"], output, AppServices.Loc["Timer Preview Caption"]);
     }
 
     [RelayCommand]

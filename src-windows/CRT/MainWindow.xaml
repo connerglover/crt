@@ -6,14 +6,15 @@
     <Grid x:Name="RootGrid">
         <Grid.Resources>
             <!--
-                Only the navigation pane is cleared, so Mica shows there and in
-                the title bar. The content area keeps its layer brush and its
-                divider: clearing those too left every working surface see-through
-                with nothing to sit on, which is the standard Fluent arrangement
-                inverted rather than achieved.
+                Only the compact rail is cleared, so Mica shows there and in the
+                title bar. The content area keeps its layer brush and divider.
+
+                The expanded pane keeps its own background too: in LeftCompact
+                the hamburger opens it as an overlay across the content, and a
+                transparent overlay leaves the menu unreadable over whatever it
+                is covering.
             -->
-            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
-            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" x:Name="PaneBackgroundBrush" Color="Transparent" />
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -63,7 +64,9 @@
             OpenPaneLength="200"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="True"
-            SelectionChanged="OnNavSelectionChanged">
+            SelectionChanged="OnNavSelectionChanged"
+            PaneOpening="OnPaneOpening"
+            PaneClosed="OnPaneClosed">
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="NavDashboard" Tag="dashboard">
                     <NavigationViewItem.Icon>
