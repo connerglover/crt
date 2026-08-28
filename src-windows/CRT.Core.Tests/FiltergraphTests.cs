@@ -461,3 +461,102 @@ public class TimerPreviewRendererTests
         Assert.Contains(@"5\:00.000", chain);          // real-time final
     }
 }
+
+public class VideoEncoderCatalogTests
+{
+    // Trimmed from real `ffmpeg -encoders` output. The GPL build carries
+    // libx264; the LGPL one does not, which is the whole reason this exists.
+    private const string GplEncoders = """
+     V....D libx264              libx264 H.264 / AVC / MPEG-4 AVC (codec h264)
+     V....D libx265              libx265 H.265 / HEVC (codec hevc)
+     V....D libopenh264          OpenH264 H.264 / AVC / MPEG-4 AVC (codec h264)
+     V....D h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)
+     V....D mpeg4                MPEG-4 part 2
+     A....D aac                  AAC (Advanced Audio Coding)
+    """;
+
+    private const string LgplEncoders = """
+     V....D libopenh264          OpenH264 H.264 / AVC / MPEG-4 AVC (codec h264)
+     V....D h264_amf             AMD AMF H.264 Encoder (codec h264)
+     V....D h264_mf              H264 via MediaFoundation (codec h264)
+     V....D h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)
+     V....D mpeg4                MPEG-4 part 2
+     A....D aac                  AAC (Advanced Audio Coding)
+    """;
+
+    [Fact]
+    public void PrefersX264WhenTheBuildHasIt()
+    {
+        var chosen = VideoEncoderCatalog.Choose(VideoEncoderCatalog.ParseAvailable(GplEncoders));
+        Assert.NotNull(chosen);
+        Assert.Equal("libx264", chosen!.Name);
+        Assert.Equal(new[] { "-preset", "veryfast", "-crf", "18" }, chosen.QualityArguments);
+    }
+
+    [Fact]
+    public void FallsBackToOpenH264OnAnLgplBuild()
+    {
+        // The regression this guards: bundling an LGPL ffmpeg made every export
+        // fail, because the exporter asked for an encoder that build lacks.
+        var chosen = VideoEncoderCatalog.Choose(VideoEncoderCatalog.ParseAvailable(LgplEncoders));
+        Assert.NotNull(chosen);
+        Assert.Equal("libopenh264", chosen!.Name);
+        Assert.Contains("-b:v", chosen.QualityArguments);
+    }
+
+    [Fact]
+    public void HardwareEncodersAreNeverChosenOnTheirOwn()
+    {
+        // ffmpeg lists these whether or not the matching GPU exists, so picking
+        // one from the listing alone trades an early failure for a late one.
+        var available = VideoEncoderCatalog.ParseAvailable(
+            " V....D h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)\n" +
+            " V....D h264_qsv             Intel Quick Sync (codec h264)\n");
+        Assert.Null(VideoEncoderCatalog.Choose(available));
+    }
+
+    [Fact]
+    public void NoCandidateAtAllReturnsNull()
+    {
+        var available = VideoEncoderCatalog.ParseAvailable(" A....D aac    AAC\n");
+        Assert.Null(VideoEncoderCatalog.Choose(available));
+    }
+
+    [Fact]
+    public void ParserReadsNamesNotDescriptions()
+    {
+        var available = VideoEncoderCatalog.ParseAvailable(GplEncoders);
+        Assert.Contains("libx264", available);
+        Assert.Contains("aac", available);
+        Assert.DoesNotContain("H.264", available);
+        Assert.DoesNotContain("(codec", available);
+    }
+
+    [Fact]
+    public void ArgumentsCarryTheChosenEncodersQualityFlags()
+    {
+        var openH264 = VideoEncoderCatalog.Candidates.Single(c => c.Name == "libopenh264");
+        var args = FfmpegExporter.BuildArguments("in.mp4", "out.mp4", 1m, 5m, "CHAIN", openH264);
+
+        Assert.Equal(new[]
+        {
+            "-y", "-ss", "1", "-to", "5", "-i", "in.mp4", "-vf", "CHAIN",
+            "-c:v", "libopenh264", "-b:v", "8M",
+            "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
+        }, args);
+    }
+
+    [Fact]
+    public void OmittingTheEncoderKeepsTheOriginalX264Command()
+    {
+        // The default has to stay byte-identical to what shipped before, or the
+        // fallback would quietly change output quality for everyone.
+        var args = FfmpegExporter.BuildArguments("in.mp4", "out.mp4", 1.5m, 10m, "CHAIN");
+        Assert.Equal(new[]
+        {
+            "-y", "-ss", "1.5", "-to", "10", "-i", "in.mp4", "-vf", "CHAIN",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
+        }, args);
+    }
+}

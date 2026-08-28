@@ -48,16 +48,17 @@ jobs:
       # in a tools folder beside it, which ToolLocator checks before offering to
       # download anything.
       #
-      # The LGPL ffmpeg build is used deliberately. The app only ever invokes
-      # ffmpeg as a subprocess, so this is mere aggregation rather than linking,
-      # and LGPL keeps the obligation to shipping the licence text (below)
-      # rather than anything touching this project's own source.
+      # The GPL build, matching what ToolLocator downloads when the tools are
+      # absent. This is not a free choice: the exporter encodes with libx264,
+      # which is GPL-licensed and therefore absent from the LGPL build — a
+      # bundle built from that one cannot export at all. Shipping it is still
+      # mere aggregation, since ffmpeg is only ever invoked as a subprocess.
       - name: Bundle ffmpeg and yt-dlp
         working-directory: src-windows
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force publish/tools | Out-Null
-          $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-lgpl.zip"
+          $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
           Invoke-WebRequest $ffmpegUrl -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-src
           foreach ($tool in "ffmpeg.exe", "ffprobe.exe") {

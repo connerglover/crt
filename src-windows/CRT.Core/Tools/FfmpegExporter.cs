@@ -5,8 +5,10 @@ namespace CRT.Core.Tools;
 
 /// <summary>
 /// Runs the timer-overlay export:
-/// <c>ffmpeg -y -ss trimStart -to trimEnd -i in -vf chain -c:v libx264 -preset veryfast -crf 18 -c:a aac -movflags +faststart out.mp4</c>
+/// <c>ffmpeg -y -ss trimStart -to trimEnd -i in -vf chain -c:v ENCODER QUALITY -c:a aac -movflags +faststart out.mp4</c>
 /// with progress parsed from stderr <c>time=</c> against the trimmed duration.
+/// The encoder is whichever <see cref="VideoEncoderCatalog"/> finds, since
+/// libx264 is missing from LGPL ffmpeg builds.
 /// </summary>
 public sealed partial class FfmpegExporter
 {
@@ -41,23 +43,36 @@ public sealed partial class FfmpegExporter
 
     /// <summary>Builds the full argv (after the executable) for the export.</summary>
     public static IReadOnlyList<string> BuildArguments(
-        string inputPath, string outputPath, decimal trimStart, decimal trimEnd, string filtergraph)
+        string inputPath, string outputPath, decimal trimStart, decimal trimEnd, string filtergraph,
+        VideoEncoder? encoder = null)
     {
-        return new[]
+        encoder ??= VideoEncoderCatalog.Default;
+        var arguments = new List<string>
         {
             "-y",
             "-ss", TimerFiltergraphBuilder.Num(trimStart),
             "-to", TimerFiltergraphBuilder.Num(trimEnd),
             "-i", inputPath,
             "-vf", filtergraph,
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "18",
+            "-c:v", encoder.Name,
+        };
+        arguments.AddRange(encoder.QualityArguments);
+        arguments.AddRange(new[]
+        {
             "-c:a", "aac",
             "-movflags", "+faststart",
             outputPath,
-        };
+        });
+        return arguments;
     }
+
+    /// <summary>
+    /// The encoder this ffmpeg will be asked to use, detected once and reused.
+    /// </summary>
+    public async Task<VideoEncoder?> ResolveEncoderAsync(CancellationToken ct = default) =>
+        _encoder ??= await VideoEncoderCatalog.DetectAsync(_ffmpegPath, ct).ConfigureAwait(false);
+
+    private VideoEncoder? _encoder;
 
     public async Task ExportAsync(
         string inputPath,
@@ -70,9 +85,17 @@ public sealed partial class FfmpegExporter
     {
         decimal duration = trimEnd - trimStart;
 
+        // Resolved before the export rather than after it fails: an encode can
+        // run for minutes before ffmpeg would report an unknown encoder.
+        var encoder = await ResolveEncoderAsync(ct).ConfigureAwait(false);
+        if (encoder is null)
+        {
+            throw new InvalidOperationException(NoEncoderMessage);
+        }
+
         var result = await ProcessRunner.RunAsync(
             _ffmpegPath,
-            BuildArguments(inputPath, outputPath, trimStart, trimEnd, filtergraph),
+            BuildArguments(inputPath, outputPath, trimStart, trimEnd, filtergraph, encoder),
             ct,
             onStdErrLine: line =>
             {
@@ -94,6 +117,14 @@ public sealed partial class FfmpegExporter
         }
         progress?.Report(1.0);
     }
+
+    /// <summary>
+    /// Shown when no candidate encoder exists, which in practice means an ffmpeg
+    /// built without any of them — so the message says what to do about it.
+    /// </summary>
+    public const string NoEncoderMessage =
+        "This copy of ffmpeg has no usable video encoder. " +
+        "Clear the FFmpeg path in Settings to let CRT download a build that does.";
 
     private static string TailOf(string stderr)
     {
