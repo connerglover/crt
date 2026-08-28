@@ -21,6 +21,8 @@ public sealed partial class MainWindow : Window
     private bool _closeConfirmed;
     private bool _alwaysOnTop;
     private bool _backdropActive;
+    private bool _userResized;
+    private Windows.Graphics.SizeInt32 _expectedSize;
 
     public MainWindow()
     {
@@ -59,6 +61,7 @@ public sealed partial class MainWindow : Window
         SetAlwaysOnTop(true);
 
         AppWindow.Closing += OnAppWindowClosing;
+        AppWindow.Changed += OnAppWindowChanged;
 
         // Dashboard is the startup page (spec §11).
         Nav.SelectedItem = NavDashboard;
@@ -67,12 +70,23 @@ public sealed partial class MainWindow : Window
 
     public bool AlwaysOnTop => _alwaysOnTop;
 
-    // Logical (DPI-independent) startup size. The Python window is a fixed
-    // 780×494 with the loads panel open; this shell adds a navigation rail and
-    // a menu bar, so it needs a little more, but the previous 1180×760 was
-    // roughly twice the area of the original for no reason.
-    private const int DefaultLogicalWidth = 940;
-    private const int DefaultLogicalHeight = 600;
+    /// <summary>
+    /// Logical (DPI-independent) size each page wants.
+    /// </summary>
+    /// <remarks>
+    /// The pages have genuinely different shapes — the video retimer needs room
+    /// for a player, the frame retimer is a narrow column of fields, the
+    /// dashboard is a list — so a single size was always too big for something.
+    /// The reference is the Python window's fixed 780×494 plus this shell's
+    /// navigation rail and menu bar.
+    /// </remarks>
+    private static (int Width, int Height) PageSize(string tag) => tag switch
+    {
+        "retimer" => (880, 620),
+        "video" => (1120, 730),
+        "settings" => (900, 680),
+        _ => (940, 620),
+    };
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -86,13 +100,56 @@ public sealed partial class MainWindow : Window
             TitleBarIcon.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(iconPath));
         }
 
+        ResizeForPage("dashboard");
+    }
+
+    /// <summary>
+    /// Sizes the window for the page being shown.
+    /// </summary>
+    /// <remarks>
+    /// Skipped when the window is maximized or the user has resized it by hand:
+    /// silently undoing someone's deliberate resize every time they switch tabs
+    /// would be worse than a slightly wrong default.
+    /// </remarks>
+    private void ResizeForPage(string tag)
+    {
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized })
+        {
+            return;
+        }
+        if (_userResized)
+        {
+            return;
+        }
+
+        var (width, height) = PageSize(tag);
         // AppWindow.Resize takes physical pixels, so a fixed number shrinks in
         // apparent size as display scaling rises. Qt sized in logical units, so
         // scale to match what the original actually looked like.
         double scale = Scale();
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(
-            (int)(DefaultLogicalWidth * scale),
-            (int)(DefaultLogicalHeight * scale)));
+        var target = new Windows.Graphics.SizeInt32((int)(width * scale), (int)(height * scale));
+        if (AppWindow.Size.Width == target.Width && AppWindow.Size.Height == target.Height)
+        {
+            return;
+        }
+        _expectedSize = target;
+        AppWindow.Resize(target);
+    }
+
+    /// <summary>
+    /// Notes a resize the app did not ask for, so per-page sizing stops
+    /// overriding the size the user chose.
+    /// </summary>
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (!args.DidSizeChange || _userResized)
+        {
+            return;
+        }
+        if (sender.Size.Width != _expectedSize.Width || sender.Size.Height != _expectedSize.Height)
+        {
+            _userResized = true;
+        }
     }
 
     private double Scale()
@@ -162,6 +219,7 @@ public sealed partial class MainWindow : Window
         {
             ContentFrame.Navigate(pageType);
         }
+        ResizeForPage(tag);
 
         // Keep the nav selection in sync when navigation is triggered from code.
         object? target = tag switch
@@ -185,6 +243,7 @@ public sealed partial class MainWindow : Window
             {
                 ContentFrame.Navigate(typeof(SettingsPage));
             }
+            ResizeForPage("settings");
             return;
         }
         if (args.SelectedItem is NavigationViewItem { Tag: string tag })
@@ -199,6 +258,7 @@ public sealed partial class MainWindow : Window
             {
                 ContentFrame.Navigate(pageType);
             }
+            ResizeForPage(tag);
         }
     }
 

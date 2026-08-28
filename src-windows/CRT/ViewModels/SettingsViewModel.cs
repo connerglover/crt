@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using CRT.Core.Localization;
 using CRT.Core.Models;
 using CRT.Core.Settings;
+using CRT.Core.Tools;
 using CRT.Services;
 
 namespace CRT.ViewModels;
@@ -35,9 +36,18 @@ public sealed partial class SettingsViewModel : ObservableObject
         AppServices.Loc["Bottom Left"], AppServices.Loc["Bottom Right"],
     };
 
-    public IReadOnlyList<string> TimerStyleOptions { get; } = new[]
+    public IReadOnlyList<string> ClockStyleOptions { get; } = new[]
     {
-        AppServices.Loc["Pill"], AppServices.Loc["Plain"],
+        AppServices.Loc["Clock Compact"], AppServices.Loc["Clock Fitted"], AppServices.Loc["Clock Full"],
+    };
+
+    public IReadOnlyList<string> TimerPresetOptions => TimerPresets.Names;
+
+    public IReadOnlyList<string> TimerFontOptions => TimerFontCatalog.Families;
+
+    public IReadOnlyList<string> TimerWeightOptions { get; } = new[]
+    {
+        AppServices.Loc["Regular"], AppServices.Loc["Bold"],
     };
 
     [ObservableProperty]
@@ -59,7 +69,90 @@ public sealed partial class SettingsViewModel : ObservableObject
     private int _timerCornerIndex = 3;
 
     [ObservableProperty]
-    private int _timerStyleIndex;
+    private string _timerFormat = "";
+
+    [ObservableProperty]
+    private int _clockStyleIndex = 1;
+
+    [ObservableProperty]
+    private int _timerFontIndex;
+
+    [ObservableProperty]
+    private int _timerWeightIndex;
+
+    [ObservableProperty]
+    private double _timerTextSize = 5.5;
+
+    [ObservableProperty]
+    private string _timerTextColor = "#ffffff";
+
+    [ObservableProperty]
+    private bool _timerBackground = true;
+
+    [ObservableProperty]
+    private string _timerBackgroundColor = "#000000";
+
+    [ObservableProperty]
+    private int _timerBackgroundOpacity = 55;
+
+    /// <summary>
+    /// Index into <see cref="TimerPresetOptions"/>. Selecting one rewrites the
+    /// format and clock style; editing either afterwards drops back to Custom
+    /// rather than leaving a preset name that no longer describes the settings.
+    /// </summary>
+    [ObservableProperty]
+    private int _timerPresetIndex;
+
+    /// <summary>Slider read-outs, so the numbers are visible while dragging.</summary>
+    public string TimerTextSizeText => TimerTextSize.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    public string TimerBackgroundOpacityText => TimerBackgroundOpacity + "%";
+
+    partial void OnTimerTextSizeChanged(double value) => OnPropertyChanged(nameof(TimerTextSizeText));
+
+    partial void OnTimerBackgroundOpacityChanged(int value) => OnPropertyChanged(nameof(TimerBackgroundOpacityText));
+
+    private bool _applyingPreset;
+
+    partial void OnTimerPresetIndexChanged(int value)
+    {
+        if (_applyingPreset || value <= 0 || value > TimerPresets.All.Count)
+        {
+            return;
+        }
+        var preset = TimerPresets.All[value - 1];
+        _applyingPreset = true;
+        TimerFormat = preset.Format;
+        ClockStyleIndex = preset.ClockStyle switch
+        {
+            Core.Tools.TimerClockStyle.Compact => 0,
+            Core.Tools.TimerClockStyle.Full => 2,
+            _ => 1,
+        };
+        _applyingPreset = false;
+    }
+
+    partial void OnTimerFormatChanged(string value) => SyncPresetSelection();
+
+    partial void OnClockStyleIndexChanged(int value) => SyncPresetSelection();
+
+    private void SyncPresetSelection()
+    {
+        if (_applyingPreset)
+        {
+            return;
+        }
+        var style = ClockStyleIndex switch
+        {
+            0 => Core.Tools.TimerClockStyle.Compact,
+            2 => Core.Tools.TimerClockStyle.Full,
+            _ => Core.Tools.TimerClockStyle.Fitted,
+        };
+        var match = TimerPresets.Match(TimerFormat, style);
+        _applyingPreset = true;
+        TimerPresetIndex = match is null ? 0 : TimerPresets.All.ToList().IndexOf(match) + 1;
+        _applyingPreset = false;
+    }
 
     [ObservableProperty]
     private string _ffmpegPath = "";
@@ -74,9 +167,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _classicMode;
-
-    [ObservableProperty]
-    private bool _dualTimer;
 
     /// <summary>Working copy of the hotkeys, edited by the hotkey dialog.</summary>
     public Dictionary<string, string> Hotkeys { get; private set; } = new();
@@ -96,11 +186,21 @@ public sealed partial class SettingsViewModel : ObservableObject
             "bottom-left" => 2,
             _ => 3,
         };
-        TimerStyleIndex = settings.TimerStyle == "plain" ? 1 : 0;
+        _applyingPreset = true;
+        TimerFormat = settings.TimerFormat;
+        ClockStyleIndex = settings.TimerClockStyle switch { "compact" => 0, "full" => 2, _ => 1 };
+        _applyingPreset = false;
+        SyncPresetSelection();
+        TimerFontIndex = Math.Max(0, TimerFontCatalog.Families.ToList().IndexOf(settings.TimerFontFamily));
+        TimerWeightIndex = settings.TimerBold ? 1 : 0;
+        TimerTextSize = settings.TimerTextSize;
+        TimerTextColor = settings.TimerTextColor;
+        TimerBackground = settings.TimerBackground;
+        TimerBackgroundColor = settings.TimerBackgroundColor;
+        TimerBackgroundOpacity = settings.TimerBackgroundOpacity;
         FfmpegPath = settings.FfmpegPath;
         YtDlpPath = settings.YtDlpPath;
         ClassicMode = settings.ClassicMode;
-        DualTimer = settings.DualTimer;
         Hotkeys = new Dictionary<string, string>(settings.Hotkeys);
     }
 
@@ -119,11 +219,19 @@ public sealed partial class SettingsViewModel : ObservableObject
             2 => "bottom-left",
             _ => "bottom-right",
         };
-        settings.TimerStyle = TimerStyleIndex == 1 ? "plain" : "pill";
+        settings.TimerFormat = TimerFormat;
+        settings.TimerClockStyle = ClockStyleIndex switch { 0 => "compact", 2 => "full", _ => "fitted" };
+        settings.TimerFontFamily = TimerFontCatalog.Families[
+            Math.Clamp(TimerFontIndex, 0, TimerFontCatalog.Families.Count - 1)];
+        settings.TimerBold = TimerWeightIndex == 1;
+        settings.TimerTextSize = TimerTextSize;
+        settings.TimerTextColor = TimerTextColor;
+        settings.TimerBackground = TimerBackground;
+        settings.TimerBackgroundColor = TimerBackgroundColor;
+        settings.TimerBackgroundOpacity = TimerBackgroundOpacity;
         settings.FfmpegPath = FfmpegPath.Trim();
         settings.YtDlpPath = YtDlpPath.Trim();
         settings.ClassicMode = ClassicMode;
-        settings.DualTimer = DualTimer;
         settings.Hotkeys = new Dictionary<string, string>(Hotkeys);
         return settings;
     }

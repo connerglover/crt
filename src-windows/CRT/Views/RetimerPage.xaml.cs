@@ -27,8 +27,8 @@ public sealed partial class RetimerPage : Page
         BuildFramerateQuickPicks();
         BuildAccelerators();
 
-        VM.SessionChanged += (_, _) => SyncModeCaption();
-        Loaded += (_, _) => SyncModeCaption();
+        VM.SessionChanged += (_, _) => SyncSidebarForMode();
+        Loaded += (_, _) => SyncSidebarForMode();
     }
 
     public SessionViewModel VM => AppServices.Session;
@@ -61,7 +61,6 @@ public sealed partial class RetimerPage : Page
         ToolTipService.SetToolTip(SecondaryCard, loc["Copy Time"]);
 
         NoSegmentsHint.Text = loc["No segments"];
-        SyncModeCaption();
     }
 
     private void BuildFramerateQuickPicks()
@@ -108,11 +107,19 @@ public sealed partial class RetimerPage : Page
     }
 
     /// <summary>
-    /// Reports the active mode. Switching it is a Settings checkbox now, so this
-    /// is a label rather than a control.
+    /// Segment mode edits its rows inline and has no sidebar, so the column has
+    /// to be collapsed as well as hidden — leaving it at its 280px width meant
+    /// the layout kept reserving space for a panel that was not there, and
+    /// resizing behaved as though it still was.
     /// </summary>
-    private void SyncModeCaption() =>
-        ModeCaption.Text = AppServices.Loc[VM.IsSegmentMode ? "Segment Mode" : "Classic Mode"];
+    private void SyncSidebarForMode()
+    {
+        bool showSidebar = !VM.IsSegmentMode && SidebarToggle.IsChecked == true;
+        Sidebar.Visibility = showSidebar ? Visibility.Visible : Visibility.Collapsed;
+        SidebarColumn.Width = showSidebar ? new GridLength(SidebarWidth) : new GridLength(0);
+    }
+
+    private const int SidebarWidth = 280;
 
     // ── Mode / sidebar ─────────────────────────────────────────────────────
 
@@ -147,12 +154,7 @@ public sealed partial class RetimerPage : Page
         row.Commit();
     }
 
-    private void OnSidebarToggle(object sender, RoutedEventArgs e)
-    {
-        bool visible = SidebarToggle.IsChecked == true;
-        Sidebar.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        SidebarColumn.Width = visible ? new GridLength(280) : new GridLength(0);
-    }
+    private void OnSidebarToggle(object sender, RoutedEventArgs e) => SyncSidebarForMode();
 
     // ── Time cards ─────────────────────────────────────────────────────────
 

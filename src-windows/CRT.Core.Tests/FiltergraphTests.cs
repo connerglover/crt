@@ -7,12 +7,14 @@ namespace CRT.Core.Tests;
 public class TimerFiltergraphBuilderTests
 {
     // Verified against real ffmpeg output frames: run starts t=1, one load 2→3,
-    // run ends t=4.5. VideoHeight 432 → fontsize 24.
-    private static readonly TimerOverlayOptions Options = new(VideoHeight: 432);
+    // run ends t=4.5. VideoHeight 432 at the default 5.5% → fontsize 24.
+    // Pinned to Full, the style this scenario was originally captured with.
+    private static readonly TimerOverlayOptions Options =
+        new(VideoHeight: 432) { ClockStyle = TimerClockStyle.Full };
 
     private const string Prefix =
-        "drawtext=fontfile='C\\:/Windows/Fonts/consola.ttf':fontsize=24:fontcolor=white:" +
-        "box=1:boxcolor=black@0.55:boxborderw=10:x=w-tw-24:y=h-th-24";
+        "drawtext=fontfile='C\\:/Windows/Fonts/consola.ttf':fontsize=24:fontcolor=0xFFFFFF:" +
+        "box=1:boxcolor=0x000000@0.55:boxborderw=10:x=w-tw-24:y=h-th-24";
 
     private static string Running(string o) =>
         $"%{{eif\\:trunc((t-{o})/3600)\\:d\\:2}}\\:" +
@@ -77,12 +79,12 @@ public class TimerFiltergraphBuilderTests
     }
 
     [Fact]
-    public void PlainStyle_OmitsBox()
+    public void BackgroundOff_OmitsBox()
     {
-        var options = new TimerOverlayOptions(VideoHeight: 1080, Style: "plain");
+        var options = Options with { VideoHeight = 1080, Background = false };
         string chain = TimerFiltergraphBuilder.Build(0m, 1m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m, options);
         Assert.DoesNotContain("box=1", chain);
-        Assert.Contains("fontsize=60", chain); // 1080 / 18
+        Assert.Contains("fontsize=59", chain); // 1080 * 5.5%
     }
 
     [Theory]
@@ -92,7 +94,7 @@ public class TimerFiltergraphBuilderTests
     [InlineData("bottom-right", ":x=w-tw-24:y=h-th-24")]
     public void Corners(string corner, string expected)
     {
-        var options = new TimerOverlayOptions(VideoHeight: 432, Corner: corner);
+        var options = Options with { Corner = corner };
         string chain = TimerFiltergraphBuilder.Build(0m, 1m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m, options);
         Assert.Contains(expected, chain);
     }
@@ -110,17 +112,236 @@ public class TimerFiltergraphBuilderTests
     public void PausesOutsideRun_AreClampedOrDropped()
     {
         string chain = TimerFiltergraphBuilder.Build(
-            5m, 10m,
-            new[]
+            runStart: 2m, runEnd: 6m,
+            pauses: new[]
             {
-                new TimerFiltergraphBuilder.Pause(0m, 1m),   // entirely before → dropped
-                new TimerFiltergraphBuilder.Pause(6m, 7m),
-                new TimerFiltergraphBuilder.Pause(11m, 12m), // entirely after → dropped
+                new TimerFiltergraphBuilder.Pause(0m, 1m),   // entirely before the run
+                new TimerFiltergraphBuilder.Pause(1m, 3m),   // clamped to 2→3
+                new TimerFiltergraphBuilder.Pause(7m, 8m),   // entirely after
             },
-            0m, Options);
-        Assert.Contains("between(t,6,7)", chain);
+            trimStart: 0m,
+            options: Options);
+
+        Assert.Contains("between(t,2,3)", chain);
         Assert.DoesNotContain("between(t,0,1)", chain);
-        Assert.DoesNotContain("between(t,11,12)", chain);
+        Assert.DoesNotContain("between(t,7,8)", chain);
+    }
+}
+
+public class TimerClockStyleTests
+{
+    private static readonly TimerFiltergraphBuilder.Pause[] OneLoad = { new(2m, 3m) };
+
+    private static TimerOverlayOptions Options(TimerClockStyle style, string format = "{time_without_loads}") =>
+        new(VideoHeight: 1080) { ClockStyle = style, Format = format };
+
+    [Fact]
+    public void Full_AlwaysUsesHoursMinutesSeconds()
+    {
+        string chain = TimerFiltergraphBuilder.Build(0m, 5m, OneLoad, 0m, Options(TimerClockStyle.Full));
+        Assert.Contains("trunc((t-0)/3600)\\:d\\:2", chain);
+        Assert.Contains("00\\:00\\:04.000", chain); // final, 5s run minus a 1s load
+    }
+
+    [Fact]
+    public void Fitted_ShortRunDropsToSecondsOnly()
+    {
+        // 4s of loadless time never reaches a minute, so no minute field appears.
+        string chain = TimerFiltergraphBuilder.Build(0m, 5m, OneLoad, 0m, Options(TimerClockStyle.Fitted));
+        Assert.DoesNotContain("/3600", chain);
+        Assert.DoesNotContain("/60", chain);
+        Assert.Contains("4.000", chain);
+    }
+
+    [Fact]
+    public void Fitted_FiveMinuteRunKeepsMinutesFromTheFirstSecond()
+    {
+        // The example from the request: in a five-minute run one second reads
+        // 0:01.000, so the minute field is present even while it is zero.
+        string chain = TimerFiltergraphBuilder.Build(0m, 300m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m,
+            Options(TimerClockStyle.Fitted));
+        Assert.Contains("trunc((t-0)/60)\\:d\\:1", chain);
+        Assert.DoesNotContain("/3600", chain);
+        Assert.Contains("5\\:00.000", chain); // held final
+    }
+
+    [Fact]
+    public void Compact_SplitsTheWindowWhereTheClockGrows()
+    {
+        // Below a minute it is S.mmm; at a minute it becomes M:SS.mmm, and
+        // drawtext cannot switch format mid-expression — so the run window is
+        // cut at the crossing and each side gets its own filter.
+        string chain = TimerFiltergraphBuilder.Build(0m, 300m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m,
+            Options(TimerClockStyle.Compact));
+        Assert.Contains("between(t,0,60)", chain);
+        Assert.Contains("between(t,60,300)", chain);
+
+        string beforeMinute = chain[..chain.IndexOf("between(t,60,300)", StringComparison.Ordinal)];
+        Assert.DoesNotContain("/60", beforeMinute);
+    }
+
+    [Fact]
+    public void Compact_ShortRunNeverSplits()
+    {
+        string chain = TimerFiltergraphBuilder.Build(0m, 5m, OneLoad, 0m, Options(TimerClockStyle.Compact));
+        Assert.DoesNotContain("between(t,60", chain);
+    }
+}
+
+public class TimerFormatTests
+{
+    private static readonly TimerFiltergraphBuilder.Pause[] OneLoad = { new(2m, 3m) };
+
+    private static TimerOverlayOptions Options(string format) =>
+        new(VideoHeight: 1080) { Format = format, ClockStyle = TimerClockStyle.Full };
+
+    [Fact]
+    public void BothClocksOnOneLine_FreezeIndependently()
+    {
+        // During the load the loadless clock is held while the real-time clock
+        // keeps running — one window, two different clock states.
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
+            Options("{time_without_loads} / {time_with_loads}"));
+
+        string loadWindow = chain
+            .Split(",drawtext")
+            .First(f => f.Contains("between(t,2,3)", StringComparison.Ordinal));
+
+        Assert.Contains("00\\:00\\:01.000", loadWindow); // loadless, held
+        Assert.Contains("%{eif", loadWindow);            // real time, still ticking
+    }
+
+    [Fact]
+    public void TwoLinesStackWithOneFilterEach()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
+            Options("{time_without_loads}\n{time_with_loads}"));
+        Assert.Contains(":y=h-th-24-88:", chain); // upper line, one line-height up
+        Assert.Contains(":y=h-th-24:", chain);    // lower line, on the edge
+    }
+
+    [Fact]
+    public void FinalsDifferByTheLoadLength()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
+            Options("{time_without_loads}\n{time_with_loads}"));
+        Assert.Contains("00\\:00\\:03.000", chain); // 4s run minus 1s load
+        Assert.Contains("00\\:00\\:04.000", chain); // real time
+    }
+
+    [Fact]
+    public void LiteralTextIsKeptAndEscaped()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
+            Options("Time: {time_without_loads}"));
+        // The colon in the caption must be escaped or drawtext reads it as the
+        // start of another option.
+        Assert.Contains("Time\\:", chain);
+    }
+
+    [Fact]
+    public void ApostropheInACaptionCannotBreakTheFilter()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
+            Options("Conner's {time_without_loads}"));
+        Assert.Contains("Conners", chain);
+        Assert.Equal(0, chain.Count(c => c == '\'') % 2);
+    }
+
+    [Fact]
+    public void OneClockOnly_EmitsNothingForTheOther()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options("{time_with_loads}"));
+        // The real-time clock never freezes, so the run is one window and the
+        // loadless clock's frozen constant never appears.
+        Assert.DoesNotContain("00\\:00\\:03.000", chain);
+        Assert.Contains("00\\:00\\:04.000", chain);
+    }
+
+    [Fact]
+    public void UnknownPlaceholderIsLeftAsText()
+    {
+        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options("{nope} {time_without_loads}"));
+        Assert.Contains("{nope}", chain);
+    }
+}
+
+public class TimerPresetTests
+{
+    [Fact]
+    public void EveryPresetProducesAUsableChain()
+    {
+        foreach (var preset in TimerPresets.All)
+        {
+            var options = new TimerOverlayOptions(VideoHeight: 1080)
+            {
+                Format = preset.Format,
+                ClockStyle = preset.ClockStyle,
+            };
+            string chain = TimerFiltergraphBuilder.Build(
+                1m, 5m, new[] { new TimerFiltergraphBuilder.Pause(2m, 3m) }, 0m, options);
+
+            Assert.False(string.IsNullOrWhiteSpace(chain), preset.Name);
+            Assert.Equal(0, chain.Count(c => c == '\'') % 2);
+            Assert.Contains("drawtext=", chain);
+        }
+    }
+
+    [Fact]
+    public void PresetsRoundTripThroughMatch()
+    {
+        foreach (var preset in TimerPresets.All)
+        {
+            Assert.Equal(preset, TimerPresets.Match(preset.Format, preset.ClockStyle));
+        }
+    }
+
+    [Fact]
+    public void AnEditedFormatMatchesNoPreset()
+    {
+        Assert.Null(TimerPresets.Match("{time_without_loads} custom", TimerClockStyle.Fitted));
+    }
+
+    [Fact]
+    public void NamesLeadWithCustom()
+    {
+        Assert.Equal(TimerPresets.Custom, TimerPresets.Names[0]);
+        Assert.Equal(TimerPresets.All.Count + 1, TimerPresets.Names.Count);
+    }
+}
+
+public class TimerFontCatalogTests
+{
+    [Fact]
+    public void ResolvesToAForwardSlashPath()
+    {
+        string path = TimerFontCatalog.ResolveFile("Consolas", bold: false);
+        Assert.DoesNotContain("\\", path);
+        Assert.EndsWith(".ttf", path);
+    }
+
+    [Fact]
+    public void UnknownFamilyFallsBackToTheDefault()
+    {
+        string path = TimerFontCatalog.ResolveFile("Not A Font", bold: false);
+        Assert.Contains("consola", path);
+    }
+
+    [Theory]
+    [InlineData("#ff8800", 100, "0xFF8800")]
+    [InlineData("ff8800", 100, "0xFF8800")]
+    [InlineData("#000000", 55, "0x000000@0.55")]
+    [InlineData("#000000", 0, "0x000000@0")]
+    public void ColorFormatting(string hex, int opacity, string expected)
+    {
+        Assert.Equal(expected, TimerFontCatalog.Color(hex, "FFFFFF", opacity));
+    }
+
+    [Fact]
+    public void InvalidColorFallsBackInsteadOfBreakingTheFilter()
+    {
+        Assert.Equal("0xFFFFFF", TimerFontCatalog.Color("not-a-color", "FFFFFF"));
+        Assert.Equal("0xFFFFFF", TimerFontCatalog.Color("", "FFFFFF"));
     }
 }
 
@@ -144,104 +365,5 @@ public class FfmpegExporterTests
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
         }, args);
-    }
-}
-
-public class DualTimerTests
-{
-    private static readonly TimerFiltergraphBuilder.Pause[] OneLoad =
-        { new(2m, 3m) };
-
-    private static TimerOverlayOptions Options(bool both, string corner = "bottom-right") =>
-        new(VideoHeight: 1080, Corner: corner)
-        {
-            ShowBothTimers = both,
-            WithoutLoadsLabel = "Without Loads",
-            WithLoadsLabel = "With Loads",
-        };
-
-    [Fact]
-    public void SingleTimerIsUnchangedByTheDualOption()
-    {
-        // The default path must produce what it did before the option existed:
-        // no caption, and every line flush against the corner with no stacking
-        // offset applied.
-        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: false));
-        Assert.DoesNotContain("Without Loads", chain);
-        Assert.DoesNotContain("With Loads", chain);
-        Assert.DoesNotContain(":y=h-th-24-", chain);
-        Assert.Contains(":y=h-th-24:", chain);
-    }
-
-    [Fact]
-    public void BothTimersAreDrawnAndLabelled()
-    {
-        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
-        Assert.Contains("Without Loads", chain);
-        Assert.Contains("With Loads", chain);
-    }
-
-    [Fact]
-    public void OnlyTheLoadlessTrackFreezes()
-    {
-        // The real-time clock ignores the loads entirely, so the frozen constant
-        // that the loadless track emits during the load must not appear on it.
-        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
-        string[] tracks = chain.Split("With Loads");
-
-        // Everything before the first "With Loads" caption belongs to the
-        // loadless track, which freezes at 00:00:01.000 for the load window.
-        Assert.Contains("between(t,2,3)", tracks[0]);
-        Assert.Contains("Without Loads 00\\:00\\:01.000", tracks[0]);
-
-        // The real-time track spans the run with no frozen window inside it.
-        string realtime = string.Join("With Loads", tracks[1..]);
-        Assert.DoesNotContain("between(t,2,3)", realtime);
-    }
-
-    [Fact]
-    public void FinalTimesDifferByTheLoadLength()
-    {
-        // 4s run with a 1s load: 00:00:03.000 loadless, 00:00:04.000 real time.
-        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
-        Assert.Contains("Without Loads 00\\:00\\:03.000", chain);
-        Assert.Contains("With Loads 00\\:00\\:04.000", chain);
-    }
-
-    [Fact]
-    public void BottomCornerStacksUpwardsSoTheBlockStaysOnTheEdge()
-    {
-        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, Options(both: true));
-        // Second line sits on the edge, first line one line-height (1.5 x the
-        // 60px font at 1080p) above it.
-        Assert.Contains(":y=h-th-24-90:", chain);
-        Assert.Contains(":y=h-th-24:", chain);
-    }
-
-    [Fact]
-    public void TopCornerStacksDownwards()
-    {
-        string chain = TimerFiltergraphBuilder.Build(
-            1m, 5m, OneLoad, 0m, Options(both: true, corner: "top-left"));
-        Assert.Contains(":y=24:", chain);
-        Assert.Contains(":y=114:", chain);
-        Assert.Contains(":x=24:", chain);
-    }
-
-    [Fact]
-    public void ApostropheInALabelCannotBreakTheFilter()
-    {
-        // A stray quote would close text='...' and make ffmpeg reject the graph.
-        var options = new TimerOverlayOptions(VideoHeight: 1080)
-        {
-            ShowBothTimers = true,
-            WithoutLoadsLabel = "Sans l'chargement",
-            WithLoadsLabel = "With Loads",
-        };
-        string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m, options);
-        Assert.Contains("Sans lchargement", chain);
-        // Every quote in the graph must still be part of a matched pair, or
-        // ffmpeg cannot parse the filter at all.
-        Assert.Equal(0, chain.Count(c => c == '\'') % 2);
     }
 }

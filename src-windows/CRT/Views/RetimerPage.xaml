@@ -22,11 +22,6 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock
-                x:Name="ModeCaption"
-                Grid.Column="0"
-                VerticalAlignment="Center"
-                FontWeight="SemiBold" />
-            <TextBlock
                 Grid.Column="1"
                 VerticalAlignment="Center"
                 Opacity="0.6"
@@ -271,10 +266,7 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <views:SessionSidebar
-                x:Name="Sidebar"
-                Grid.Column="1"
-                Visibility="{x:Bind Invert(VM.IsSegmentMode), Mode=OneWay}" />
+            <views:SessionSidebar x:Name="Sidebar" Grid.Column="1" />
         </Grid>
     </Grid>
 </Page>

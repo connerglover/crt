@@ -102,12 +102,14 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal("en", settings.Language);
         Assert.Equal("Mod Note: Retimed to {time_without_loads}", settings.ModNoteFormat);
         Assert.Equal("bottom-right", settings.TimerCorner);
-        Assert.Equal("pill", settings.TimerStyle);
+        Assert.Equal("{time_without_loads}", settings.TimerFormat);
+        Assert.Equal("fitted", settings.TimerClockStyle);
+        Assert.Equal("Consolas", settings.TimerFontFamily);
+        Assert.True(settings.TimerBackground);
         Assert.Equal("", settings.FfmpegPath);
         // Segment mode is the default; classic is the opt-in.
         Assert.Equal("segments", settings.DefaultMode);
         Assert.False(settings.ClassicMode);
-        Assert.False(settings.DualTimer);
         Assert.Equal("Ctrl+N", settings.Hotkeys["New Time"]);
         Assert.Equal(",", settings.Hotkeys["video_frame_back"]);
     }
@@ -135,7 +137,7 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal("bottom-right", settings.TimerCorner);
         string text = File.ReadAllText(IniPath);
         Assert.Contains("timer_corner = bottom-right", text);
-        Assert.Contains("dual_timer = False", text);
+        Assert.Contains("timer_clock_style = fitted", text);
         Assert.Contains("default_mode = segments", text);
         Assert.Contains("video_frame_back = ,", text);
         Assert.Contains("enable_updates = False", text);

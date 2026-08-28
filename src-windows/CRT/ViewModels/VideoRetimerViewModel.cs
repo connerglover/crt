@@ -88,9 +88,19 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
     /// <summary>Current playback position in seconds (decimal, from the player clock).</summary>
     public decimal PositionSeconds => (decimal)Player.PlaybackSession.Position.TotalSeconds;
 
-    public int CurrentFrame => Fps == 0m
+    /// <summary>
+    /// The frame the user is on. While stepping this is the frame we asked for
+    /// rather than one re-derived from the clock: a decoder that presents a hair
+    /// early or late would otherwise turn a run of single steps into a drifting
+    /// counter.
+    /// </summary>
+    public int CurrentFrame => _frameCursor ?? FrameFromClock;
+
+    private int FrameFromClock => Fps == 0m
         ? 0
         : (int)Math.Round(PositionSeconds * Fps, 0, MidpointRounding.ToEven);
+
+    private int? _frameCursor;
 
     // ── Import ─────────────────────────────────────────────────────────────
 
@@ -259,6 +269,7 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         IsPlaying = false;
         _pendingLoadStart = null;
         _pendingSegmentStart = null;
+        _frameCursor = null;
         PendingMarkText = "";
     }
 
@@ -514,33 +525,19 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _reverseTimer;
 
     [RelayCommand]
-    public void StepForward()
-    {
-        if (!HasVideo)
-        {
-            return;
-        }
-        StopScan();
-        Player.Pause();
-        Player.StepForwardOneFrame();
-        UpdatePosition();
-    }
+    public void StepForward() => StepFrames(1);
 
-    [RelayCommand]
-    public void StepBackward()
-    {
-        if (!HasVideo)
-        {
-            return;
-        }
-        StopScan();
-        Player.Pause();
-        Player.StepBackwardOneFrame();
-        UpdatePosition();
-    }
-
-    /// <summary>Arrow keys: ±5 frames; Shift+Arrow: ±1 second.</summary>
-    public void JumpFrames(int frames)
+    /// <summary>
+    /// Moves by whole frames.
+    /// </summary>
+    /// <remarks>
+    /// This replaces MediaPlayer's StepForwardOneFrame/StepBackwardOneFrame,
+    /// which were neither accurate nor quick: stepping back routinely moved
+    /// about three frames and took roughly a second to present, because the API
+    /// resolves backwards steps through the surrounding keyframe. Seeking to a
+    /// computed frame time is exact and immediate.
+    /// </remarks>
+    public void StepFrames(int delta)
     {
         if (!HasVideo || Fps == 0m)
         {
@@ -548,9 +545,30 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         }
         StopScan();
         Player.Pause();
-        decimal seconds = frames / Fps;
-        SeekSeconds(PositionSeconds + seconds);
+
+        int target = Math.Max(0, CurrentFrame + delta);
+        if (DurationSeconds > 0m)
+        {
+            int lastFrame = (int)Math.Floor(DurationSeconds * Fps) - 1;
+            if (lastFrame >= 0)
+            {
+                target = Math.Min(target, lastFrame);
+            }
+        }
+
+        _frameCursor = target;
+        // Land a quarter into the frame: seeking to its exact boundary can
+        // resolve to either neighbour depending on how the demuxer rounds.
+        Player.PlaybackSession.Position =
+            TimeSpan.FromSeconds((double)((target + 0.25m) / Fps));
+        UpdatePosition();
     }
+
+    [RelayCommand]
+    public void StepBackward() => StepFrames(-1);
+
+    /// <summary>Arrow keys: ±5 frames; Shift+Arrow: ±1 second.</summary>
+    public void JumpFrames(int frames) => StepFrames(frames);
 
     public void JumpSeconds(decimal seconds)
     {
@@ -564,6 +582,7 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
 
     public void SeekSeconds(decimal seconds)
     {
+        _frameCursor = null;
         decimal clamped = Math.Max(0m, DurationSeconds > 0m ? Math.Min(seconds, DurationSeconds) : seconds);
         Player.PlaybackSession.Position = TimeSpan.FromSeconds((double)clamped);
         UpdatePosition();
@@ -573,6 +592,10 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
     public void UpdatePosition()
     {
         IsPlaying = Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing;
+        if (IsPlaying)
+        {
+            _frameCursor = null;
+        }
         int frame = CurrentFrame;
         CurrentFrameText = frame.ToString(CultureInfo.InvariantCulture);
         CurrentTimeText = TimeFormatter.FormatFrameTime(frame, Fps, TimeSession.DefaultPrecision);
@@ -717,14 +740,20 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         var pauses = BuildPauses(session, fps);
         var (trimStart, trimEnd) = FfmpegExporter.ComputeTrim(runStart, runEnd, _videoInfo.DurationSeconds);
 
+        var settings = AppServices.Settings;
         var options = new TimerOverlayOptions(
-            VideoHeight: _videoInfo.Height > 0 ? _videoInfo.Height : 1080,
-            Corner: AppServices.Settings.TimerCorner,
-            Style: AppServices.Settings.TimerStyle)
+            VideoHeight: _videoInfo.Height > 0 ? _videoInfo.Height : 1080)
         {
-            ShowBothTimers = AppServices.Settings.DualTimer,
-            WithoutLoadsLabel = AppServices.Loc["Without Loads"],
-            WithLoadsLabel = AppServices.Loc["With Loads"],
+            Format = settings.TimerFormat,
+            ClockStyle = TimerClockStyleExtensions.ParseSerialString(settings.TimerClockStyle),
+            Corner = settings.TimerCorner,
+            FontFamily = settings.TimerFontFamily,
+            Bold = settings.TimerBold,
+            TextSizePercent = settings.TimerTextSize,
+            TextColor = settings.TimerTextColor,
+            Background = settings.TimerBackground,
+            BackgroundColor = settings.TimerBackgroundColor,
+            BackgroundOpacity = settings.TimerBackgroundOpacity,
         };
         string chain = TimerFiltergraphBuilder.Build(runStart, runEnd, pauses, trimStart, options);
 

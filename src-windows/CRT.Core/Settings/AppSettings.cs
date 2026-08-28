@@ -17,11 +17,30 @@ public sealed class AppSettings
     /// <summary>top-left | top-right | bottom-left | bottom-right.</summary>
     public string TimerCorner { get; set; } = "bottom-right";
 
-    /// <summary>pill | plain.</summary>
-    public string TimerStyle { get; set; } = "pill";
+    /// <summary>
+    /// Template for the burned-in timer, same placeholder vocabulary as the mod
+    /// note: <c>{time_without_loads}</c> / <c>{time_with_loads}</c>. A newline
+    /// stacks another line.
+    /// </summary>
+    public string TimerFormat { get; set; } = Tools.TimerFiltergraphBuilder.DefaultFormat;
 
-    /// <summary>Burn both the loadless and real-time clocks into the export.</summary>
-    public bool DualTimer { get; set; }
+    /// <summary>compact | fitted | full.</summary>
+    public string TimerClockStyle { get; set; } = "fitted";
+
+    public string TimerFontFamily { get; set; } = Tools.TimerFontCatalog.DefaultFamily;
+
+    public bool TimerBold { get; set; }
+
+    /// <summary>Text height as a percentage of the video height.</summary>
+    public double TimerTextSize { get; set; } = 5.5;
+
+    public string TimerTextColor { get; set; } = "#ffffff";
+
+    public bool TimerBackground { get; set; } = true;
+
+    public string TimerBackgroundColor { get; set; } = "#000000";
+
+    public int TimerBackgroundOpacity { get; set; } = 55;
 
     /// <summary>Explicit ffmpeg path; empty = auto-discover.</summary>
     public string FfmpegPath { get; set; } = "";
@@ -53,8 +72,15 @@ public sealed class AppSettings
         Language = Language,
         ModNoteFormat = ModNoteFormat,
         TimerCorner = TimerCorner,
-        TimerStyle = TimerStyle,
-        DualTimer = DualTimer,
+        TimerFormat = TimerFormat,
+        TimerClockStyle = TimerClockStyle,
+        TimerFontFamily = TimerFontFamily,
+        TimerBold = TimerBold,
+        TimerTextSize = TimerTextSize,
+        TimerTextColor = TimerTextColor,
+        TimerBackground = TimerBackground,
+        TimerBackgroundColor = TimerBackgroundColor,
+        TimerBackgroundOpacity = TimerBackgroundOpacity,
         FfmpegPath = FfmpegPath,
         YtDlpPath = YtDlpPath,
         DefaultMode = DefaultMode,
@@ -68,8 +94,15 @@ public sealed class AppSettings
         Language == other.Language &&
         ModNoteFormat == other.ModNoteFormat &&
         TimerCorner == other.TimerCorner &&
-        TimerStyle == other.TimerStyle &&
-        DualTimer == other.DualTimer &&
+        TimerFormat == other.TimerFormat &&
+        TimerClockStyle == other.TimerClockStyle &&
+        TimerFontFamily == other.TimerFontFamily &&
+        TimerBold == other.TimerBold &&
+        TimerTextSize == other.TimerTextSize &&
+        TimerTextColor == other.TimerTextColor &&
+        TimerBackground == other.TimerBackground &&
+        TimerBackgroundColor == other.TimerBackgroundColor &&
+        TimerBackgroundOpacity == other.TimerBackgroundOpacity &&
         FfmpegPath == other.FfmpegPath &&
         YtDlpPath == other.YtDlpPath &&
         DefaultMode == other.DefaultMode &&

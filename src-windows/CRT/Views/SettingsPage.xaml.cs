@@ -16,6 +16,7 @@ public sealed partial class SettingsPage : Page
         InitializeComponent();
         ApplyLocalization();
         UpdateSwatch();
+        UpdateTimerSwatches();
     }
 
     public SettingsViewModel VM { get; }
@@ -30,13 +31,25 @@ public sealed partial class SettingsPage : Page
         LanguageLabel.Text = loc["Language"];
         ModNoteLabel.Text = loc["Mod Note Format"];
         TimerCornerLabel.Text = loc["Timer Corner"];
-        TimerStyleLabel.Text = loc["Timer Style"];
+        TimerHeader.Text = loc["In-Video Timer"];
+        TimerPresetLabel.Text = loc["Preset"];
+        TimerFormatLabel.Text = loc["Timer Format"];
+        TimerFormatHint.Text = loc["Timer Format Hint"];
+        ClockStyleLabel.Text = loc["Clock Style"];
+        ClockStyleHint.Text = loc["Clock Style Hint"];
+        TimerLookHeader.Text = loc["Appearance"];
+        TimerFontLabel.Text = loc["Font"];
+        TimerSizeLabel.Text = loc["Text Size"];
+        TimerTextColorLabel.Text = loc["Text Color"];
+        TimerBackgroundCheck.Content = loc["Timer Background"];
+        TimerBackgroundColorLabel.Text = loc["Background Color"];
+        TimerOpacityLabel.Text = loc["Background Opacity"];
+        TimerTextColorButton.Content = loc["Pick"];
+        TimerBackgroundColorButton.Content = loc["Pick"];
         FfmpegLabel.Text = loc["FFmpeg Path"];
         YtDlpLabel.Text = loc["yt-dlp Path"];
         ClassicModeCheck.Content = loc["Classic Mode"];
         ClassicModeHint.Text = loc["Classic Mode Description"];
-        DualTimerCheck.Content = loc["Dual Timer"];
-        DualTimerHint.Text = loc["Dual Timer Description"];
         HotkeysButton.Content = loc["Customize Hotkeys"];
         ApplyButton.Content = loc["Apply"];
         CancelButton.Content = loc["Cancel"];
@@ -46,7 +59,10 @@ public sealed partial class SettingsPage : Page
         Fill(ThemeCombo, VM.ThemeOptions);
         Fill(LanguageCombo, VM.LanguageOptions);
         Fill(TimerCornerCombo, VM.TimerCornerOptions);
-        Fill(TimerStyleCombo, VM.TimerStyleOptions);
+        Fill(ClockStyleCombo, VM.ClockStyleOptions);
+        Fill(TimerPresetCombo, VM.TimerPresetOptions);
+        Fill(TimerFontCombo, VM.TimerFontOptions);
+        Fill(TimerWeightCombo, VM.TimerWeightOptions);
 
         // Re-apply indexes after filling (SelectedIndex resets when items change).
         VM.CancelCommand.Execute(null);
@@ -82,5 +98,47 @@ public sealed partial class SettingsPage : Page
             AccentPicker.Color = color;
             _suppressPickerEvent = false;
         }
+    }
+
+    // ── Timer colors ───────────────────────────────────────────────────────
+
+    private void OnTimerTextColorChanged(object sender, TextChangedEventArgs e) => UpdateTimerSwatches();
+
+    private void OnTimerBackgroundColorChanged(object sender, TextChangedEventArgs e) => UpdateTimerSwatches();
+
+    private void OnTimerTextColorPicked(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_suppressPickerEvent)
+        {
+            return;
+        }
+        VM.TimerTextColor = ThemeService.FormatHexColor(args.NewColor);
+        UpdateTimerSwatches();
+    }
+
+    private void OnTimerBackgroundColorPicked(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_suppressPickerEvent)
+        {
+            return;
+        }
+        VM.TimerBackgroundColor = ThemeService.FormatHexColor(args.NewColor);
+        UpdateTimerSwatches();
+    }
+
+    private void UpdateTimerSwatches()
+    {
+        _suppressPickerEvent = true;
+        if (ThemeService.TryParseHexColor(VM.TimerTextColor, out Windows.UI.Color text))
+        {
+            TimerTextSwatch.Background = new SolidColorBrush(text);
+            TimerTextPicker.Color = text;
+        }
+        if (ThemeService.TryParseHexColor(VM.TimerBackgroundColor, out Windows.UI.Color background))
+        {
+            TimerBackgroundSwatch.Background = new SolidColorBrush(background);
+            TimerBackgroundPicker.Color = background;
+        }
+        _suppressPickerEvent = false;
     }
 }
