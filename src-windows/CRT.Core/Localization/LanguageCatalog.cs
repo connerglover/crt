@@ -123,6 +123,7 @@ public static class LanguageCatalog
         ["Discord message copied"] = "Discord message copied",
         ["YouTube chapters copied"] = "YouTube chapters copied",
         ["Time copied"] = "Time copied",
+        ["Settings applied"] = "Settings applied",
         ["Copy Time"] = "Copy Time",
         ["Load added successfully."] = "Load added successfully.",
         ["Segment added successfully."] = "Segment added successfully.",
@@ -140,7 +141,6 @@ public static class LanguageCatalog
         ["Framerate Mismatch Message"] = "This video appears to be {detected} FPS, but the session is set to {current} FPS.\n\nUpdate the framerate before calculating the frame?",
         ["Woah!"] = "Woah!",
         ["Concerningly Long Load Message"] = "This load is concerningly long. Would you like to add the load anyway?",
-        ["Please restart the application to apply the changes."] = "Please restart the application to apply the changes.",
         ["Restore Defaults Message"] = "Are you sure you want to restore the default settings?",
 
         // Video retimer

@@ -25,6 +25,7 @@ public static class ThemeService
         {
             return; // fall back to system accent
         }
+        CurrentAccent = hex;
 
         var resources = Application.Current.Resources;
         resources["SystemAccentColor"] = accent;
@@ -35,6 +36,71 @@ public static class ThemeService
         resources["SystemAccentColorDark2"] = Darken(accent, 0.30);
         resources["SystemAccentColorDark3"] = Darken(accent, 0.45);
     }
+
+    /// <summary>
+    /// Accent brushes derived from <c>SystemAccentColor</c>, by resource key.
+    /// </summary>
+    /// <remarks>
+    /// WinUI materializes these once from the accent color, so rewriting the
+    /// color entries does not reach anything already on screen and a theme
+    /// round-trip does not rebuild them either. Mutating the brush objects in
+    /// place does: every control holds a reference to the same brush, so the
+    /// change is picked up immediately and without a restart.
+    /// </remarks>
+    private static readonly string[] AccentFillBrushes =
+    {
+        "AccentFillColorDefaultBrush",
+        "AccentFillColorSecondaryBrush",
+        "AccentFillColorTertiaryBrush",
+        "AccentAAFillColorDefaultBrush",
+        "SystemControlBackgroundAccentBrush",
+        "SystemControlForegroundAccentBrush",
+        "SystemControlHighlightAccentBrush",
+    };
+
+    private static readonly string[] AccentTextBrushes =
+    {
+        "AccentTextFillColorPrimaryBrush",
+        "AccentTextFillColorSecondaryBrush",
+        "AccentTextFillColorTertiaryBrush",
+    };
+
+    /// <summary>
+    /// Repaints the accent brushes for the live theme so an accent change
+    /// applies without restarting.
+    /// </summary>
+    /// <param name="dark">Whether the window is currently showing dark theme.</param>
+    public static void RefreshAccentBrushes(bool dark)
+    {
+        if (!TryParseHexColor(CurrentAccent, out Color accent))
+        {
+            return;
+        }
+
+        // Dark surfaces take a lightened accent and light surfaces a darkened
+        // one, matching how WinUI derives them; text uses a stronger shade so it
+        // stays legible against the background it sits on.
+        Color fill = dark ? Lighten(accent, 0.30) : Darken(accent, 0.15);
+        Color text = dark ? Lighten(accent, 0.45) : Darken(accent, 0.30);
+
+        Apply(AccentFillBrushes, fill);
+        Apply(AccentTextBrushes, text);
+
+        static void Apply(IEnumerable<string> keys, Color color)
+        {
+            foreach (string key in keys)
+            {
+                if (Application.Current.Resources.TryGetValue(key, out object? value) &&
+                    value is Microsoft.UI.Xaml.Media.SolidColorBrush brush)
+                {
+                    brush.Color = color;
+                }
+            }
+        }
+    }
+
+    /// <summary>The accent last passed to <see cref="ApplyAccentColor"/>.</summary>
+    private static string CurrentAccent = "";
 
     public static bool TryParseHexColor(string hex, out Color color)
     {

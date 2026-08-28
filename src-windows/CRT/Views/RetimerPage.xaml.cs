@@ -29,6 +29,10 @@ public sealed partial class RetimerPage : Page
 
         VM.SessionChanged += (_, _) => SyncSidebarForMode();
         Loaded += (_, _) => SyncSidebarForMode();
+
+        // Cached pages keep their strings and accelerators from construction,
+        // so they have to be told when either changes.
+        AppServices.SettingsChanged += OnSettingsChanged;
     }
 
     public SessionViewModel VM => AppServices.Session;
@@ -74,9 +78,19 @@ public sealed partial class RetimerPage : Page
         }
     }
 
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        ApplyLocalization();
+        BuildFramerateQuickPicks();
+        BuildAccelerators();
+        VM.RefreshAll();
+        SyncSidebarForMode();
+    }
+
     private void BuildAccelerators()
     {
         var hotkeys = AppServices.Settings.Hotkeys;
+        _hotkeys?.Dispose();
         _hotkeys = new PageHotkeys(this);
 
         void Add(string actionId, Action action) => _hotkeys.Bind(hotkeys, actionId, action);

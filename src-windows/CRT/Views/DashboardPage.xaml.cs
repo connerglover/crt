@@ -18,6 +18,13 @@ public sealed partial class DashboardPage : Page
     {
         InitializeComponent();
         ApplyLocalization();
+        AppServices.SettingsChanged += (_, _) =>
+        {
+            ApplyLocalization();
+            // Row labels live on the item view models, so the list has to be
+            // rebuilt for a language change to reach them.
+            VM.RefreshLibrary();
+        };
 
         Loaded += (_, _) => _ = VM.ActivateAsync();
         Unloaded += (_, _) => VM.Deactivate();

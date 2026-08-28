@@ -16,6 +16,7 @@ public sealed partial class RetimerMenuBar : UserControl
     {
         InitializeComponent();
         ApplyLocalization();
+        AppServices.SettingsChanged += (_, _) => ApplyLocalization();
 
         Loaded += (_, _) => MenuAlwaysOnTop.IsChecked = AppServices.MainWindow?.AlwaysOnTop ?? true;
     }

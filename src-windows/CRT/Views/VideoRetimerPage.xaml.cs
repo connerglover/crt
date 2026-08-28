@@ -37,6 +37,7 @@ public sealed partial class VideoRetimerPage : Page
         TimelineSlider.AddHandler(PointerReleasedEvent, new PointerEventHandler(OnSliderReleased), true);
 
         SessionVM.SessionChanged += (_, _) => RedrawRegions();
+        AppServices.SettingsChanged += OnSettingsChanged;
         Loaded += OnPageLoaded;
         Unloaded += OnPageUnloaded;
     }
@@ -99,9 +100,16 @@ public sealed partial class VideoRetimerPage : Page
         MarkEndButton.Content = segments ? loc["Mark Segment End"] : loc["Mark Run End"];
     }
 
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        ApplyLocalization();
+        BuildAccelerators();
+    }
+
     private void BuildAccelerators()
     {
         var hotkeys = AppServices.Settings.Hotkeys;
+        _hotkeys?.Dispose();
         _hotkeys = new PageHotkeys(this);
 
         void Add(string actionId, Action action) => _hotkeys.Bind(hotkeys, actionId, action);

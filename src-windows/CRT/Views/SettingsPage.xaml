@@ -42,7 +42,7 @@
                         CornerRadius="4"
                         BorderThickness="1"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" />
-                    <TextBox x:Name="AccentBox" Width="120" Text="{x:Bind VM.AccentColor, Mode=TwoWay}" TextChanged="OnAccentTextChanged" />
+                    <TextBox x:Name="AccentBox" Width="120" Text="{x:Bind VM.AccentColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAccentTextChanged" />
                     <Button x:Name="PickColorButton">
                         <Button.Flyout>
                             <Flyout>

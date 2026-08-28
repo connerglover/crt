@@ -70,9 +70,31 @@ public static class AppServices
         Dashboard = new DashboardViewModel();
     }
 
+    /// <summary>
+    /// Raised after settings are re-read, so live pages can re-apply anything
+    /// they captured at construction — their localized strings and their
+    /// keyboard accelerators.
+    /// </summary>
+    /// <remarks>
+    /// Most settings need no such handling: they are read from
+    /// <see cref="Settings"/> at the point of use, and swapping the instance
+    /// below is enough. Only what a page copies once has to be told.
+    /// </remarks>
+    public static event EventHandler? SettingsChanged;
+
     /// <summary>Re-reads settings from disk after the settings page applies changes.</summary>
     public static void ReloadSettings()
     {
+        string previousLanguage = Settings.Language;
         Settings = SettingsService.Current();
+
+        // The localizer is bound to one language, so a language change means a
+        // new one; every page then re-reads its strings through it.
+        if (!string.Equals(previousLanguage, Settings.Language, StringComparison.Ordinal))
+        {
+            Loc = new Localizer(Settings.Language);
+        }
+
+        SettingsChanged?.Invoke(null, EventArgs.Empty);
     }
 }

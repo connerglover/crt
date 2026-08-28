@@ -23,20 +23,23 @@ public sealed partial class SettingsViewModel : ObservableObject
         LoadFrom(_edited);
     }
 
-    public IReadOnlyList<string> ThemeOptions { get; } = new[]
+    // Computed, not captured: these were built once in the constructor, so a
+    // language change left the pickers reading in the previous language until
+    // the app was restarted.
+    public IReadOnlyList<string> ThemeOptions => new[]
     {
         AppServices.Loc["Automatic"], AppServices.Loc["Dark"], AppServices.Loc["Light"],
     };
 
     public IReadOnlyList<string> LanguageOptions => LanguageCatalog.LanguageNames;
 
-    public IReadOnlyList<string> TimerCornerOptions { get; } = new[]
+    public IReadOnlyList<string> TimerCornerOptions => new[]
     {
         AppServices.Loc["Top Left"], AppServices.Loc["Top Right"],
         AppServices.Loc["Bottom Left"], AppServices.Loc["Bottom Right"],
     };
 
-    public IReadOnlyList<string> ClockStyleOptions { get; } = new[]
+    public IReadOnlyList<string> ClockStyleOptions => new[]
     {
         AppServices.Loc["Clock Compact"], AppServices.Loc["Clock Fitted"], AppServices.Loc["Clock Full"],
     };
@@ -45,7 +48,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<string> TimerFontOptions => TimerFontCatalog.Families;
 
-    public IReadOnlyList<string> TimerWeightOptions { get; } = new[]
+    public IReadOnlyList<string> TimerWeightOptions => new[]
     {
         AppServices.Loc["Regular"], AppServices.Loc["Bold"],
     };
@@ -236,8 +239,18 @@ public sealed partial class SettingsViewModel : ObservableObject
         return settings;
     }
 
+    /// <summary>
+    /// Saves the edited settings and applies them to the running app.
+    /// </summary>
+    /// <remarks>
+    /// Synchronous now that nothing here waits on a dialog. Note the ordering:
+    /// <c>ReloadSettings</c> raises the change event, and the settings page's
+    /// own handler re-reads its values through <c>Cancel</c>, which clones from
+    /// the freshly-loaded settings rather than the stale local copy — so the
+    /// page shows what was just saved rather than reverting.
+    /// </remarks>
     [RelayCommand]
-    private async Task ApplyAsync()
+    private void Apply()
     {
         var oldSettings = AppServices.Settings;
         var newSettings = CollectInto();
@@ -245,19 +258,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         AppServices.ReloadSettings();
         _edited = AppServices.Settings.Clone();
 
-        // Theme is cheap to re-apply, so it takes effect immediately rather than
-        // waiting for the restart the remaining settings still need.
-        AppServices.MainWindow?.ApplyTheme(newSettings.Theme);
-
         // This checkbox is the only way to change timing mode, so it has to act
         // on the open session rather than only on the next one.
         AppServices.Session.SetMode(TimingModeExtensions.ParseSerialString(newSettings.DefaultMode));
 
+        // ReloadSettings has already rebuilt the localizer and told every live
+        // page to re-read its strings and rebind its hotkeys, so there is
+        // nothing left that a restart would fix.
         if (!newSettings.ContentEquals(oldSettings))
         {
-            await AppServices.Dialogs.ShowInfoAsync(
-                AppServices.Loc["Settings"],
-                AppServices.Loc["Please restart the application to apply the changes."]);
+            AppServices.MainWindow?.ShowToast(AppServices.Loc["Settings applied"]);
         }
     }
 

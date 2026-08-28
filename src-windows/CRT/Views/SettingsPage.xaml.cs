@@ -17,6 +17,11 @@ public sealed partial class SettingsPage : Page
         ApplyLocalization();
         UpdateSwatch();
         UpdateTimerSwatches();
+
+        // The settings page is cached like the others, so it re-reads its own
+        // labels and refills its pickers when the language changes — including
+        // when the change was made here.
+        AppServices.SettingsChanged += (_, _) => ApplyLocalization();
     }
 
     public SettingsViewModel VM { get; }

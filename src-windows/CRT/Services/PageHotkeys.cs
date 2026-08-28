@@ -48,12 +48,16 @@ public sealed class PageHotkeys
     private readonly FrameworkElement _owner;
     private readonly List<Fallback> _fallbacks = new();
     private readonly KeyEventHandler _handler;
+    private readonly RoutedEventHandler _onLoaded;
+    private readonly RoutedEventHandler _onUnloaded;
     private UIElement? _attachedTo;
 
     public PageHotkeys(FrameworkElement owner)
     {
         _owner = owner;
         _handler = OnKeyDown;
+        _onLoaded = (_, _) => Attach();
+        _onUnloaded = (_, _) => Detach();
 
         // These accelerators belong to the page as a whole, not to any one
         // control. Left on the default Auto, WinUI advertises the owner's first
@@ -62,8 +66,26 @@ public sealed class PageHotkeys
         // binding, purely because it was registered first.
         owner.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
 
-        owner.Loaded += (_, _) => Attach();
-        owner.Unloaded += (_, _) => Detach();
+        owner.Loaded += _onLoaded;
+        owner.Unloaded += _onUnloaded;
+    }
+
+    /// <summary>
+    /// Tears this binding set down completely, so a page can rebuild its
+    /// hotkeys after the user edits them.
+    /// </summary>
+    /// <remarks>
+    /// Both the window-root key handler and the owner's Loaded/Unloaded
+    /// subscriptions have to go: without this a rebuild would stack a second
+    /// live handler on top of the first, and every edit would add another.
+    /// </remarks>
+    public void Dispose()
+    {
+        Detach();
+        _fallbacks.Clear();
+        _owner.Loaded -= _onLoaded;
+        _owner.Unloaded -= _onUnloaded;
+        _owner.KeyboardAccelerators.Clear();
     }
 
     /// <summary>

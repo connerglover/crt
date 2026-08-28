@@ -54,6 +54,7 @@ public sealed partial class MainWindow : Window
 
         ApplyTheme(AppServices.Settings.Theme);
         RootGrid.Loaded += (_, _) => AppServices.Dialogs.Root = RootGrid.XamlRoot;
+        AppServices.SettingsChanged += (_, _) => ApplySettings();
 
         ConfigureAppWindow();
 
@@ -159,6 +160,48 @@ public sealed partial class MainWindow : Window
         return dpi == 0 ? 1.0 : dpi / 96.0;
     }
 
+    /// <summary>
+    /// Re-applies everything the shell captured from settings: the navigation
+    /// labels, the accent color and the theme.
+    /// </summary>
+    private void ApplySettings()
+    {
+        NavDashboard.Content = AppServices.Loc["Dashboard"];
+        NavRetimer.Content = AppServices.Loc["Frame Retimer"];
+        NavVideo.Content = AppServices.Loc["Video Retimer"];
+
+        ThemeService.ApplyAccentColor(AppServices.Settings.AccentColor);
+        ApplyTheme(AppServices.Settings.Theme);
+        ThemeService.RefreshAccentBrushes(IsDarkTheme());
+        RefreshThemeResources();
+    }
+
+    /// <summary>
+    /// Forces controls to re-resolve their ThemeResource references.
+    /// </summary>
+    /// <remarks>
+    /// Accent brushes are resolved once when a control loads, so overwriting
+    /// the accent entries in the resource dictionary does not reach anything
+    /// already on screen. A theme round-trip re-runs that resolution, which is
+    /// the only hook the framework exposes for it; it is applied to the root so
+    /// the whole tree is covered in one pass.
+    /// </remarks>
+    /// <summary>True when the given theme (or the current one) renders dark.</summary>
+    private bool IsDarkTheme(ElementTheme? theme = null) => (theme ?? RootGrid.RequestedTheme) switch
+    {
+        ElementTheme.Dark => true,
+        ElementTheme.Light => false,
+        _ => Application.Current.RequestedTheme == ApplicationTheme.Dark,
+    };
+
+    private void RefreshThemeResources()
+    {
+        ElementTheme target = RootGrid.RequestedTheme;
+        ElementTheme other = target == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
+        RootGrid.RequestedTheme = other;
+        RootGrid.RequestedTheme = target;
+    }
+
     // ── Theme ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -177,12 +220,7 @@ public sealed partial class MainWindow : Window
         titleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
 
-        bool dark = theme switch
-        {
-            ElementTheme.Dark => true,
-            ElementTheme.Light => false,
-            _ => Application.Current.RequestedTheme == ApplicationTheme.Dark,
-        };
+        bool dark = IsDarkTheme(theme);
         // Without a backdrop the transparent nav surfaces have nothing behind
         // them, so supply the base color the backdrop would otherwise provide.
         RootGrid.Background = _backdropActive
