@@ -24,6 +24,28 @@
     <FileVersion>2.0.0.0</FileVersion>
   </PropertyGroup>
 
+  <!--
+    Publish as one executable. Self-contained already meant the user needed
+    nothing installed, but it spread ~150 files beside the app; this packs them
+    into the host and extracts to a cache on first run.
+
+    IncludeNativeLibrariesForSelfExtract is required, not optional: WinUI ships
+    native DLLs and without it they stay loose next to the exe, which is the
+    thing being avoided.
+
+    EnableCompressionInSingleFile is deliberately off. Measured on this app it
+    takes the exe from 154 MB to 63 MB, but the release asset is a zip either
+    way and that only moves the download from 59 MB to 57 MB — while startup
+    goes from 0.6s to 3.0s on every launch, not just the first. A retiming tool
+    is opened constantly, so two megabytes is not worth five times the start.
+  -->
+  <PropertyGroup Condition="'$(PublishSingleFileOverride)' != 'false'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="Assets\icon.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

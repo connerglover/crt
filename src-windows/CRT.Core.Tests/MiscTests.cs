@@ -304,3 +304,87 @@ public class UpdateCheckerVersionTests
         Assert.False(UpdateChecker.IsNewer(latest, "2.0.0"));
     }
 }
+
+public class ToolLocatorBundleTests : IDisposable
+{
+    private readonly string _toolsDir;
+    private readonly string _bundledDir;
+
+    public ToolLocatorBundleTests()
+    {
+        _toolsDir = Path.Combine(Path.GetTempPath(), $"crt-tools-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_toolsDir);
+
+        // The first bundled probe is AppContext.BaseDirectory/tools, which for a
+        // test run is the test output folder.
+        _bundledDir = ToolLocator.BundledDirectories().First();
+        Directory.CreateDirectory(_bundledDir);
+    }
+
+    public void Dispose()
+    {
+        foreach (string path in Directory.EnumerateFiles(_bundledDir, "*.stub"))
+        {
+            File.Delete(path);
+        }
+        foreach (string name in new[] { "ffmpeg.exe", "ffprobe.exe", "yt-dlp.exe" })
+        {
+            string candidate = Path.Combine(_bundledDir, name);
+            if (File.Exists(candidate) && new FileInfo(candidate).Length == 0)
+            {
+                File.Delete(candidate);
+            }
+        }
+        try
+        {
+            Directory.Delete(_toolsDir, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    private ToolLocator Locator(string ffmpegSetting = "", string ytDlpSetting = "") =>
+        new(_toolsDir, () => ffmpegSetting, () => ytDlpSetting);
+
+    [Fact]
+    public void FindsAToolShippedBesideTheExecutable()
+    {
+        string shipped = Path.Combine(_bundledDir, "ffmpeg.exe");
+        File.WriteAllBytes(shipped, Array.Empty<byte>());
+
+        Assert.Equal(shipped, Locator().Find(ToolKind.Ffmpeg));
+    }
+
+    [Fact]
+    public void BundledBeatsTheDownloadDirectory()
+    {
+        // A build that ships the tools should never fall through to the folder
+        // downloads land in, or a stale download would win over what shipped.
+        string shipped = Path.Combine(_bundledDir, "yt-dlp.exe");
+        File.WriteAllBytes(shipped, Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_toolsDir, "yt-dlp.exe"), Array.Empty<byte>());
+
+        Assert.Equal(shipped, Locator().Find(ToolKind.YtDlp));
+    }
+
+    [Fact]
+    public void AnExplicitSettingStillWins()
+    {
+        string shipped = Path.Combine(_bundledDir, "ffmpeg.exe");
+        File.WriteAllBytes(shipped, Array.Empty<byte>());
+        string chosen = Path.Combine(_toolsDir, "my-ffmpeg.exe");
+        File.WriteAllBytes(chosen, Array.Empty<byte>());
+
+        Assert.Equal(chosen, Locator(ffmpegSetting: chosen).Find(ToolKind.Ffmpeg));
+    }
+
+    [Fact]
+    public void NothingShippedFallsThroughToTheDownloadDirectory()
+    {
+        string downloaded = Path.Combine(_toolsDir, "ffprobe.exe");
+        File.WriteAllBytes(downloaded, Array.Empty<byte>());
+
+        Assert.Equal(downloaded, Locator().Find(ToolKind.Ffprobe));
+    }
+}

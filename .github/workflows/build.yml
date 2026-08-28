@@ -34,22 +34,59 @@ jobs:
         working-directory: src-windows
         run: dotnet test CRT.Core.Tests/CRT.Core.Tests.csproj -c Release --no-build
 
-      # Self-contained so the Windows App SDK runtime ships with the app and
-      # users don't need to install anything.
+      # Self-contained and single-file: the Windows App SDK runtime ships with
+      # the app, packed into the one executable (see CRT.csproj).
       - name: Publish
         working-directory: src-windows
         run: dotnet publish CRT/CRT.csproj -c Release -r win-x64 --self-contained -o publish
 
-      - name: Package
+      # ffmpeg and yt-dlp are separate programs, so they cannot live inside the
+      # single-file exe — they have to exist as files to be launched. They ship
+      # in a tools folder beside it, which ToolLocator checks before offering to
+      # download anything.
+      #
+      # The LGPL ffmpeg build is used deliberately. The app only ever invokes
+      # ffmpeg as a subprocess, so this is mere aggregation rather than linking,
+      # and LGPL keeps the obligation to shipping the licence text (below)
+      # rather than anything touching this project's own source.
+      - name: Bundle ffmpeg and yt-dlp
         working-directory: src-windows
-        run: Compress-Archive -Path publish/* -DestinationPath crt-windows.zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force publish/tools | Out-Null
+          $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-lgpl.zip"
+          Invoke-WebRequest $ffmpegUrl -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-src
+          foreach ($tool in "ffmpeg.exe", "ffprobe.exe") {
+            $found = Get-ChildItem ffmpeg-src -Recurse -Filter $tool | Select-Object -First 1
+            if (-not $found) { throw "$tool missing from the ffmpeg archive" }
+            Copy-Item $found.FullName publish/tools/
+          }
+          $licence = Get-ChildItem ffmpeg-src -Recurse -Include "LICENSE*", "COPYING*" | Select-Object -First 1
+          if ($licence) { Copy-Item $licence.FullName publish/tools/FFMPEG-LICENSE.txt }
+          Invoke-WebRequest "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
+            -OutFile publish/tools/yt-dlp.exe
+          Remove-Item ffmpeg.zip, ffmpeg-src -Recurse -Force
+          Copy-Item ../THIRD-PARTY.md publish/tools/THIRD-PARTY.md
 
+      - name: Show package contents
+        working-directory: src-windows
+        shell: pwsh
+        run: |
+          Get-ChildItem publish -Recurse -File |
+            Select-Object @{N='Path';E={$_.FullName.Replace("$PWD\publish\", '')}},
+                          @{N='MB';E={[math]::Round($_.Length/1MB, 1)}} |
+            Sort-Object MB -Descending | Format-Table -AutoSize
+          "Total: {0} MB" -f [math]::Round(((Get-ChildItem publish -Recurse -File |
+            Measure-Object Length -Sum).Sum / 1MB), 1)
+
+      # The directory is uploaded, not a zip of it: upload-artifact always zips
+      # what it is given, so handing it an archive produced a zip inside a zip.
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: crt-windows
-          path: src-windows/crt-windows.zip
-          compression-level: 0
+          path: src-windows/publish/
 
   release:
     needs: [build-windows]
@@ -57,16 +94,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download build artifacts
+      - name: Download build artifact
         uses: actions/download-artifact@v8
         with:
-          path: release-assets
-          merge-multiple: true
+          name: crt-windows
+          path: crt-windows
+
+      # Release assets are attached as-is, so this is where the archive belongs
+      # — one zip holding the exe and its tools folder.
+      - name: Archive for release
+        run: |
+          cd crt-windows
+          zip -r ../crt-windows.zip .
 
       - name: Create/update draft release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          files: release-assets/*
+          files: crt-windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

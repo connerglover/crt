@@ -58,6 +58,28 @@ public sealed class ToolLocator
     public static string ApproxDownloadSize(ToolKind kind) =>
         kind == ToolKind.YtDlp ? YtDlpApproxSize : FfmpegApproxSize;
 
+    /// <summary>
+    /// Directories a build may ship tools in, next to the executable.
+    /// </summary>
+    /// <remarks>
+    /// ffmpeg and yt-dlp are separate programs that have to exist as files to be
+    /// launched, so they cannot live inside a single-file executable the way the
+    /// app's own assemblies do — they sit in a <c>tools</c> folder beside it
+    /// instead. <see cref="AppContext.BaseDirectory"/> points at the host for a
+    /// single-file build, but <see cref="Environment.ProcessPath"/> is checked
+    /// too so a framework-dependent layout resolves the same way.
+    /// </remarks>
+    public static IEnumerable<string> BundledDirectories()
+    {
+        yield return Path.Combine(AppContext.BaseDirectory, "tools");
+
+        string? processDirectory = Path.GetDirectoryName(Environment.ProcessPath ?? "");
+        if (!string.IsNullOrEmpty(processDirectory))
+        {
+            yield return Path.Combine(processDirectory, "tools");
+        }
+    }
+
     /// <summary>Finds a tool, or returns null when it is not installed anywhere we look.</summary>
     public string? Find(ToolKind kind)
     {
@@ -83,11 +105,21 @@ public sealed class ToolLocator
             }
         }
 
-        // 2. The config tools dir.
-        string bundled = Path.Combine(_toolsDirectory, ExecutableName(kind));
-        if (File.Exists(bundled))
+        // 2. Shipped alongside the app, if this build bundles them.
+        foreach (string directory in BundledDirectories())
         {
-            return bundled;
+            string shipped = Path.Combine(directory, ExecutableName(kind));
+            if (File.Exists(shipped))
+            {
+                return shipped;
+            }
+        }
+
+        // 3. The config tools dir, where downloads land.
+        string downloaded = Path.Combine(_toolsDirectory, ExecutableName(kind));
+        if (File.Exists(downloaded))
+        {
+            return downloaded;
         }
 
         // 3. PATH lookup.
