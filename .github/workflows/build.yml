@@ -73,6 +73,28 @@ jobs:
           Remove-Item ffmpeg.zip, ffmpeg-src -Recurse -Force
           Copy-Item ../THIRD-PARTY.md publish/tools/THIRD-PARTY.md
 
+      # Guards the regression that shipped in the previous build: the bundle was
+      # switched to an ffmpeg variant that has no x264, so every export failed
+      # with "unknown encoder" while CI stayed green. A build that cannot encode
+      # should not reach anyone, so this proves it can before packaging.
+      - name: Verify the bundled ffmpeg can encode
+        working-directory: src-windows
+        shell: pwsh
+        run: |
+          $ffmpeg = "publish/tools/ffmpeg.exe"
+          $encoders = & $ffmpeg -hide_banner -encoders 2>&1 | Out-String
+          if ($encoders -notmatch '\blibx264\b') {
+            throw "The bundled ffmpeg has no libx264. The GPL build is required; the LGPL one omits it."
+          }
+          # Listing it is not the same as being able to use it, so encode.
+          & $ffmpeg -hide_banner -loglevel error -y `
+            -f lavfi -i "testsrc=size=320x180:duration=1:rate=10" `
+            -vf "drawtext=fontfile='C\:/Windows/Fonts/consola.ttf':fontsize=20:fontcolor=0xFFFFFF:x=10:y=10:text='00\:00\:01.000'" `
+            -c:v libx264 -preset veryfast -crf 18 smoke.mp4
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path smoke.mp4)) { throw "Encoding a test clip failed" }
+          "Encoded {0:N0} bytes with libx264 and a drawtext overlay." -f (Get-Item smoke.mp4).Length
+          Remove-Item smoke.mp4
+
       - name: Show package contents
         working-directory: src-windows
         shell: pwsh
