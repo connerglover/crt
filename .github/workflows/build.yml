@@ -36,9 +36,12 @@ jobs:
 
       # Self-contained and single-file: the Windows App SDK runtime ships with
       # the app, packed into the one executable (see CRT.csproj).
+      # DebugType is passed here rather than left to the app's csproj so it
+      # reaches the referenced projects too: setting it on CRT alone still let
+      # CRT.Core drop its .pdb into the package.
       - name: Publish
         working-directory: src-windows
-        run: dotnet publish CRT/CRT.csproj -c Release -r win-x64 --self-contained -o publish
+        run: dotnet publish CRT/CRT.csproj -c Release -r win-x64 --self-contained -p:DebugType=none -o publish
 
       # ffmpeg and yt-dlp are separate programs, so they cannot live inside the
       # single-file exe — they have to exist as files to be launched. They ship
