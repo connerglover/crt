@@ -17,6 +17,7 @@ public sealed partial class RetimerMenuBar : UserControl
         InitializeComponent();
         ApplyLocalization();
         AppServices.SettingsChanged += (_, _) => ApplyLocalization();
+        VM.SessionChanged += (_, _) => SyncClearRowsItem();
 
         Loaded += (_, _) => MenuAlwaysOnTop.IsChecked = AppServices.MainWindow?.AlwaysOnTop ?? true;
     }
@@ -47,7 +48,7 @@ public sealed partial class RetimerMenuBar : UserControl
         MenuCopyModNote.Text = loc["Copy Mod Note"];
         MenuCopyDiscord.Text = loc["Copy Discord Message"];
         MenuCopyChapters.Text = loc["Copy YouTube Chapters"];
-        MenuClearLoads.Text = loc["Clear Loads"];
+        SyncClearRowsItem();
         MenuAlwaysOnTop.Text = loc["Always on Top"];
         MenuAbout.Text = loc["About"];
 
@@ -97,6 +98,21 @@ public sealed partial class RetimerMenuBar : UserControl
     private void OnMenuCopyChapters(object sender, RoutedEventArgs e) => _ = VM.CopyYouTubeChaptersAsync();
 
     private void OnMenuClearLoads(object sender, RoutedEventArgs e) => VM.ClearRowsCommand.Execute(null);
+
+    /// <summary>
+    /// Keeps the clear item honest about what it will do.
+    /// </summary>
+    /// <remarks>
+    /// It was hard-labelled "Clear Loads" and always enabled, so in segment mode
+    /// it named something the session does not have, and in either mode it
+    /// offered to clear a list that was already empty. The label follows the
+    /// mode and the item disables when there is nothing to clear.
+    /// </remarks>
+    private void SyncClearRowsItem()
+    {
+        MenuClearLoads.Text = VM.ClearRowsLabel;
+        MenuClearLoads.IsEnabled = VM.CanClearRows;
+    }
 
     private void OnMenuAlwaysOnTop(object sender, RoutedEventArgs e) =>
         AppServices.MainWindow?.SetAlwaysOnTop(MenuAlwaysOnTop.IsChecked);

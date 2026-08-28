@@ -12,9 +12,13 @@ public class TimerFiltergraphBuilderTests
     private static readonly TimerOverlayOptions Options =
         new(VideoHeight: 432) { ClockStyle = TimerClockStyle.Full };
 
-    private const string Prefix =
-        "drawtext=fontfile='C\\:/Windows/Fonts/consola.ttf':fontsize=24:fontcolor=0xFFFFFF:" +
-        "box=1:boxcolor=0x000000@0.55:boxborderw=10:x=w-tw-24:y=h-th-24";
+    // Derived, not literal: the box padding now scales with the text size, and
+    // the font path comes from the font index with whatever casing the system
+    // records.
+    private static readonly string Prefix =
+        $"drawtext=fontfile='{Options.FontFile.Replace(":", "\\:")}':fontsize={Options.FontSize}:" +
+        $"fontcolor=0xFFFFFF:box=1:boxcolor=0x000000@0.55:boxborderw={Options.BoxPadding}:" +
+        "x=w-tw-24:y=h-th-24";
 
     private static string Running(string o) =>
         $"%{{eif\\:trunc((t-{o})/3600)\\:d\\:2}}\\:" +
@@ -212,13 +216,22 @@ public class TimerFormatTests
     }
 
     [Fact]
-    public void TwoLinesStackWithOneFilterEach()
+    public void TwoLinesShareOneFilterAndOneBox()
     {
+        // Both lines live in a single drawtext separated by a real newline, so
+        // there is one box rather than two. Two translucent boxes pulled close
+        // together composited into a darker band where they overlapped.
         string chain = TimerFiltergraphBuilder.Build(1m, 5m, OneLoad, 0m,
             Options("{time_without_loads}\n{time_with_loads}"));
-        Assert.Contains(":y=h-th-24-71:", chain); // upper line, one line-height up (59 * 1.2)
-        Assert.Contains(":y=h-th-24:", chain);    // lower line, on the edge
+
+        Assert.DoesNotContain("h-th-24-", chain);          // no per-line offsets
+        Assert.Contains("\n", chain);                      // the two lines
+        Assert.Equal(1, CountBoxesPerWindow(chain));
     }
+
+    /// <summary>Boxes drawn for the first time window, however many lines it has.</summary>
+    private static int CountBoxesPerWindow(string chain) =>
+        chain.Split(",drawtext")[0].Split("box=1").Length - 1;
 
     [Fact]
     public void FinalsDifferByTheLoadLength()
@@ -358,10 +371,13 @@ public class FfmpegExporterTests
     [Fact]
     public void BuildArguments_ExactShape()
     {
-        var args = FfmpegExporter.BuildArguments("in.mp4", "out.mp4", 1.5m, 10m, "CHAIN");
+        // filter_complex rather than -vf: a rounded background is a second input
+        // overlaid under the text, and -vf only accepts one.
+        var args = FfmpegExporter.BuildArguments("in.mp4", "out.mp4", 1.5m, 10m, "GRAPH");
         Assert.Equal(new[]
         {
-            "-y", "-ss", "1.5", "-to", "10", "-i", "in.mp4", "-vf", "CHAIN",
+            "-y", "-ss", "1.5", "-to", "10", "-i", "in.mp4",
+            "-filter_complex", "GRAPH", "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
         }, args);
@@ -379,20 +395,31 @@ public class TimerLineSpacingTests
             });
 
     [Fact]
-    public void TighterSpacingMovesTheUpperLineDown()
+    public void SpacingIsExpressedRelativeToTheFontsOwnLineHeight()
     {
-        // Font is 59px at 1080p, so the offset is that times the spacing.
-        Assert.Contains(":y=h-th-24-59:", Chain(1.0));   // flush
-        Assert.Contains(":y=h-th-24-71:", Chain(1.2));   // default
-        Assert.Contains(":y=h-th-24-88:", Chain(1.5));   // the old fixed value (88.5 rounds to even)
+        // drawtext already advances by the font's line height, so the option is
+        // the difference from it — which is what lets the lines sit closer than
+        // the font intends. Font is 59px at 1080p.
+        Assert.DoesNotContain("line_spacing", Chain(1.0));   // no change from default
+        Assert.Contains("line_spacing=-6", Chain(0.9));      // tighter
+        Assert.Contains("line_spacing=-15", Chain(0.75));    // tighter still
+        Assert.Contains("line_spacing=30", Chain(1.5));      // looser
     }
 
     [Fact]
-    public void SpacingIsIrrelevantToASingleLine()
+    public void SpacingCanGoBelowTheFontsLineHeight()
+    {
+        // 59 * -0.5 is -29.5, which rounds to even.
+        Assert.Contains("line_spacing=-30", Chain(0.5));
+    }
+
+    [Fact]
+    public void SingleLineNeverStacks()
     {
         string chain = TimerFiltergraphBuilder.Build(1m, 5m, Array.Empty<TimerFiltergraphBuilder.Pause>(), 0m,
             new TimerOverlayOptions(VideoHeight: 1080) { LineSpacing = 2.5 });
         Assert.DoesNotContain("h-th-24-", chain);
+        Assert.DoesNotContain("\n", chain);
     }
 }
 
@@ -416,7 +443,6 @@ public class FittedSharedUnitTests
         string chain = Chain(TimerClockStyle.Fitted);
         Assert.Contains(@"0\:50.000", chain);   // loadless final, now carrying minutes
         Assert.Contains(@"1\:10.000", chain);   // real-time final
-        Assert.DoesNotContain("text='50.000'", chain);
     }
 
     [Fact]
@@ -425,7 +451,8 @@ public class FittedSharedUnitTests
         // Compact is defined as "only the units needed", so its two clocks are
         // allowed to differ; only Fitted promises a single width.
         string chain = Chain(TimerClockStyle.Compact);
-        Assert.Contains("text='50.000'", chain);
+        Assert.Contains("50.000", chain);
+        Assert.DoesNotContain("0\\:50.000", chain);
     }
 }
 
@@ -436,7 +463,7 @@ public class TimerPreviewRendererTests
     {
         var options = new TimerOverlayOptions(TimerPreviewRenderer.PaneHeight);
         string chain = TimerPreviewRenderer.BuildChain(options);
-        string[] args = TimerPreviewRenderer.BuildArguments(chain, "out.png");
+        string[] args = TimerPreviewRenderer.BuildArguments(chain, "out.png", options);
 
         Assert.Contains("color=c=black:s=640x360:d=96:r=1", args);
         Assert.Contains("color=c=white:s=640x360:d=96:r=1", args);
@@ -540,7 +567,8 @@ public class VideoEncoderCatalogTests
 
         Assert.Equal(new[]
         {
-            "-y", "-ss", "1", "-to", "5", "-i", "in.mp4", "-vf", "CHAIN",
+            "-y", "-ss", "1", "-to", "5", "-i", "in.mp4",
+            "-filter_complex", "CHAIN", "-map", "[v]", "-map", "0:a?",
             "-c:v", "libopenh264", "-b:v", "8M",
             "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
         }, args);
@@ -554,7 +582,8 @@ public class VideoEncoderCatalogTests
         var args = FfmpegExporter.BuildArguments("in.mp4", "out.mp4", 1.5m, 10m, "CHAIN");
         Assert.Equal(new[]
         {
-            "-y", "-ss", "1.5", "-to", "10", "-i", "in.mp4", "-vf", "CHAIN",
+            "-y", "-ss", "1.5", "-to", "10", "-i", "in.mp4",
+            "-filter_complex", "CHAIN", "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
             "-c:a", "aac", "-movflags", "+faststart", "out.mp4",
         }, args);

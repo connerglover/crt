@@ -29,7 +29,10 @@ public sealed class SettingsService
         new("timer_font", "Consolas"),
         new("timer_bold", "False"),
         new("timer_text_size", "5.5"),
-        new("timer_line_spacing", "1.2"),
+        new("timer_line_spacing", "0.9"),
+        new("timer_outline_width", "0"),
+        new("timer_outline_color", "#000000"),
+        new("timer_corner_radius", "8"),
         new("timer_text_color", "#ffffff"),
         new("timer_background", "True"),
         new("timer_background_color", "#000000"),
@@ -142,7 +145,10 @@ public sealed class SettingsService
             TimerFontFamily = _ini.Get(SettingsSection, "timer_font", "Consolas"),
             TimerBold = _ini.GetBoolean(SettingsSection, "timer_bold", false),
             TimerTextSize = ReadDouble(_ini.Get(SettingsSection, "timer_text_size", "5.5"), 5.5),
-            TimerLineSpacing = ReadDouble(_ini.Get(SettingsSection, "timer_line_spacing", "1.2"), 1.2),
+            TimerLineSpacing = ReadDouble(_ini.Get(SettingsSection, "timer_line_spacing", "0.9"), 0.9),
+            TimerOutlineWidth = ReadInt(_ini.Get(SettingsSection, "timer_outline_width", "0"), 0),
+            TimerOutlineColor = _ini.Get(SettingsSection, "timer_outline_color", "#000000"),
+            TimerCornerRadius = ReadInt(_ini.Get(SettingsSection, "timer_corner_radius", "8"), 8),
             TimerTextColor = _ini.Get(SettingsSection, "timer_text_color", "#ffffff"),
             TimerBackground = _ini.GetBoolean(SettingsSection, "timer_background", true),
             TimerBackgroundColor = _ini.Get(SettingsSection, "timer_background_color", "#000000"),
@@ -177,6 +183,11 @@ public sealed class SettingsService
             settings.TimerTextSize.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
         _ini.Set(SettingsSection, "timer_line_spacing",
             settings.TimerLineSpacing.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+        _ini.Set(SettingsSection, "timer_outline_width",
+            settings.TimerOutlineWidth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _ini.Set(SettingsSection, "timer_outline_color", settings.TimerOutlineColor);
+        _ini.Set(SettingsSection, "timer_corner_radius",
+            settings.TimerCornerRadius.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ini.Set(SettingsSection, "timer_text_color", settings.TimerTextColor);
         _ini.Set(SettingsSection, "timer_background", settings.TimerBackground ? "True" : "False");
         _ini.Set(SettingsSection, "timer_background_color", settings.TimerBackgroundColor);

@@ -34,8 +34,15 @@ public static class TimerFontCatalog
 
     public const string DefaultFamily = "Consolas";
 
-    /// <summary>Families offered in the settings picker, in display order.</summary>
-    public static IReadOnlyList<string> Families { get; } = Files.Keys.ToList();
+    /// <summary>
+    /// Every font installed on the machine, not just the curated list.
+    /// </summary>
+    /// <remarks>
+    /// The curated table below is still the fallback path: it maps the fonts
+    /// that ship with Windows to known filenames, which covers the case where
+    /// the registry cannot be read.
+    /// </remarks>
+    public static IReadOnlyList<string> Families => SystemFontIndex.FamilyNames;
 
     /// <summary>
     /// Resolves a family and weight to an absolute font path, falling back to
@@ -43,6 +50,13 @@ public static class TimerFontCatalog
     /// </summary>
     public static string ResolveFile(string family, bool bold)
     {
+        // Anything installed, resolved through the registry index first.
+        string? installed = SystemFontIndex.FindFile(family ?? "", bold);
+        if (installed is not null)
+        {
+            return Normalize(installed);
+        }
+
         if (!Files.TryGetValue(family ?? "", out var entry))
         {
             entry = Files[DefaultFamily];
@@ -71,6 +85,23 @@ public static class TimerFontCatalog
     /// as escapes of its own.
     /// </summary>
     private static string Normalize(string path) => path.Replace('\\', '/');
+
+    /// <summary>
+    /// Splits a colour into decimal components, for filters that take channels
+    /// separately rather than a colour string — <c>geq</c> in particular.
+    /// </summary>
+    public static (int R, int G, int B) Rgb(string hex, string fallback)
+    {
+        string text = (hex ?? "").TrimStart('#');
+        if (text.Length != 6 || !text.All(Uri.IsHexDigit))
+        {
+            text = fallback;
+        }
+        return (
+            Convert.ToInt32(text[..2], 16),
+            Convert.ToInt32(text[2..4], 16),
+            Convert.ToInt32(text[4..6], 16));
+    }
 
     /// <summary>
     /// Converts <c>#rrggbb</c> to the <c>0xRRGGBB</c> form drawtext expects,

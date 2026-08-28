@@ -754,8 +754,22 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
             Background = settings.TimerBackground,
             BackgroundColor = settings.TimerBackgroundColor,
             BackgroundOpacity = settings.TimerBackgroundOpacity,
+            LineSpacing = settings.TimerLineSpacing,
+            OutlineWidth = settings.TimerOutlineWidth,
+            OutlineColor = settings.TimerOutlineColor,
+            CornerRadius = settings.TimerCornerRadius,
         };
+
+        // A rounded background is composited at a fixed size, so the text has to
+        // be measured before the graph can be built.
+        if (options.Background && options.CornerRadius > 0)
+        {
+            var (boxWidth, boxHeight) = TimerTextMeasurer.Measure(options);
+            options = options with { BoxWidth = boxWidth, BoxHeight = boxHeight };
+        }
+
         string chain = TimerFiltergraphBuilder.Build(runStart, runEnd, pauses, trimStart, options);
+        string graph = TimerFiltergraphBuilder.ComposeGraph(chain, options, "0:v", "v");
 
         var exporter = new FfmpegExporter(ffmpeg);
         string outputPath = outputFile.Path;
@@ -764,7 +778,7 @@ public sealed partial class VideoRetimerViewModel : ObservableObject
         {
             completed = await AppServices.Dialogs.RunWithProgressAsync(
                 AppServices.Loc["Exporting"],
-                (progress, ct) => exporter.ExportAsync(VideoPath, outputPath, trimStart, trimEnd, chain, progress, ct));
+                (progress, ct) => exporter.ExportAsync(VideoPath, outputPath, trimStart, trimEnd, graph, progress, ct));
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

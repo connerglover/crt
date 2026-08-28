@@ -34,8 +34,19 @@ public sealed class AppSettings
     /// <summary>Text height as a percentage of the video height.</summary>
     public double TimerTextSize { get; set; } = 5.5;
 
-    /// <summary>Gap between stacked timer lines, as a multiple of the text size.</summary>
-    public double TimerLineSpacing { get; set; } = 1.2;
+    /// <summary>
+    /// Gap between stacked timer lines, as a multiple of the text size. Values
+    /// below 1.0 pull the lines closer than the font's own line height.
+    /// </summary>
+    public double TimerLineSpacing { get; set; } = 0.9;
+
+    /// <summary>Outline around the timer glyphs, in pixels; 0 is off.</summary>
+    public int TimerOutlineWidth { get; set; }
+
+    public string TimerOutlineColor { get; set; } = "#000000";
+
+    /// <summary>Corner radius of the timer background, in pixels.</summary>
+    public int TimerCornerRadius { get; set; } = 8;
 
     public string TimerTextColor { get; set; } = "#ffffff";
 
@@ -81,6 +92,9 @@ public sealed class AppSettings
         TimerBold = TimerBold,
         TimerTextSize = TimerTextSize,
         TimerLineSpacing = TimerLineSpacing,
+        TimerOutlineWidth = TimerOutlineWidth,
+        TimerOutlineColor = TimerOutlineColor,
+        TimerCornerRadius = TimerCornerRadius,
         TimerTextColor = TimerTextColor,
         TimerBackground = TimerBackground,
         TimerBackgroundColor = TimerBackgroundColor,
@@ -104,6 +118,9 @@ public sealed class AppSettings
         TimerBold == other.TimerBold &&
         TimerTextSize == other.TimerTextSize &&
         TimerLineSpacing == other.TimerLineSpacing &&
+        TimerOutlineWidth == other.TimerOutlineWidth &&
+        TimerOutlineColor == other.TimerOutlineColor &&
+        TimerCornerRadius == other.TimerCornerRadius &&
         TimerTextColor == other.TimerTextColor &&
         TimerBackground == other.TimerBackground &&
         TimerBackgroundColor == other.TimerBackgroundColor &&

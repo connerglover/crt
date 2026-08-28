@@ -41,6 +41,9 @@
   -->
   <PropertyGroup Condition="'$(PublishSingleFileOverride)' != 'false'">
     <PublishSingleFile>true</PublishSingleFile>
+    <!-- Stated here as well as on the publish command, or the SDK warns that
+         single-file is only recommended alongside self-contained. -->
+    <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <DebugType>none</DebugType>

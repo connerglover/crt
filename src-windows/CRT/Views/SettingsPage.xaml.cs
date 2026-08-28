@@ -30,6 +30,17 @@ public sealed partial class SettingsPage : Page
     {
         var loc = AppServices.Loc;
         PageHeader.Text = loc["CRT Settings"];
+        GeneralHeader.Text = loc["General"];
+        TimingHeader.Text = loc["Timing"];
+        TimerContentHeader.Text = loc["Timer Content"];
+        TimerTextHeader.Text = loc["Timer Text"];
+        TimerBackgroundHeader.Text = loc["Timer Background Section"];
+        TimerLayoutHeader.Text = loc["Timer Placement"];
+        ToolsHeader.Text = loc["Tools"];
+        ShortcutsHeader.Text = loc["Hotkeys"];
+        TimerOutlineLabel.Text = loc["Outline"];
+        TimerOutlineColorLabel.Text = loc["Outline Color"];
+        TimerCornersLabel.Text = loc["Rounded Corners"];
         UpdatesCheck.Content = loc["Automatically Check for Updates"];
         ThemeLabel.Text = loc["Theme"];
         AccentLabel.Text = loc["Accent Color"];
@@ -42,7 +53,6 @@ public sealed partial class SettingsPage : Page
         TimerFormatHint.Text = loc["Timer Format Hint"];
         ClockStyleLabel.Text = loc["Clock Style"];
         ClockStyleHint.Text = loc["Clock Style Hint"];
-        TimerLookHeader.Text = loc["Appearance"];
         TimerFontLabel.Text = loc["Font"];
         TimerSizeLabel.Text = loc["Text Size"];
         TimerSpacingLabel.Text = loc["Line Spacing"];
@@ -53,6 +63,7 @@ public sealed partial class SettingsPage : Page
         TimerOpacityLabel.Text = loc["Background Opacity"];
         TimerTextColorButton.Content = loc["Pick"];
         TimerBackgroundColorButton.Content = loc["Pick"];
+        TimerOutlineColorButton.Content = loc["Pick"];
         FfmpegLabel.Text = loc["FFmpeg Path"];
         YtDlpLabel.Text = loc["yt-dlp Path"];
         ClassicModeCheck.Content = loc["Classic Mode"];
@@ -68,7 +79,9 @@ public sealed partial class SettingsPage : Page
         Fill(TimerCornerCombo, VM.TimerCornerOptions);
         Fill(ClockStyleCombo, VM.ClockStyleOptions);
         Fill(TimerPresetCombo, VM.TimerPresetOptions);
-        Fill(TimerFontCombo, VM.TimerFontOptions);
+        // Bound rather than copied: the template needs the family name as the
+        // item so it can draw each entry in its own font.
+        TimerFontCombo.ItemsSource = VM.TimerFontOptions;
         Fill(TimerWeightCombo, VM.TimerWeightOptions);
 
         // Re-apply indexes after filling (SelectedIndex resets when items change).
@@ -113,6 +126,18 @@ public sealed partial class SettingsPage : Page
 
     private void OnTimerBackgroundColorChanged(object sender, TextChangedEventArgs e) => UpdateTimerSwatches();
 
+    private void OnTimerOutlineColorChanged(object sender, TextChangedEventArgs e) => UpdateTimerSwatches();
+
+    private void OnTimerOutlineColorPicked(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_suppressPickerEvent)
+        {
+            return;
+        }
+        VM.TimerOutlineColor = ThemeService.FormatHexColor(args.NewColor);
+        UpdateTimerSwatches();
+    }
+
     private void OnTimerTextColorPicked(ColorPicker sender, ColorChangedEventArgs args)
     {
         if (_suppressPickerEvent)
@@ -145,6 +170,11 @@ public sealed partial class SettingsPage : Page
         {
             TimerBackgroundSwatch.Background = new SolidColorBrush(background);
             TimerBackgroundPicker.Color = background;
+        }
+        if (ThemeService.TryParseHexColor(VM.TimerOutlineColor, out Windows.UI.Color outline))
+        {
+            TimerOutlineSwatch.Background = new SolidColorBrush(outline);
+            TimerOutlinePicker.Color = outline;
         }
         _suppressPickerEvent = false;
     }

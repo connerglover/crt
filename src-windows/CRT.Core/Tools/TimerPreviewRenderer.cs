@@ -55,16 +55,22 @@ public static class TimerPreviewRenderer
     /// is what remains. That avoids seeking a filtered graph, which is awkward
     /// once the two panes are stacked together.
     /// </remarks>
-    public static string[] BuildArguments(string chain, string outputPath)
+    public static string[] BuildArguments(string chain, string outputPath, TimerOverlayOptions options)
     {
         string duration = (SampleAt + 1m).ToString(CultureInfo.InvariantCulture);
         string size = $"{PaneWidth}x{PaneHeight}";
+
+        // Each pane is composed separately so a rounded background is overlaid
+        // onto both, then the two are stacked.
+        string black = TimerFiltergraphBuilder.ComposeGraph(chain, options, "0:v", "a");
+        string white = TimerFiltergraphBuilder.ComposeGraph(chain, options, "1:v", "b");
+
         return new[]
         {
             "-y",
             "-f", "lavfi", "-i", $"color=c=black:s={size}:d={duration}:r=1",
             "-f", "lavfi", "-i", $"color=c=white:s={size}:d={duration}:r=1",
-            "-filter_complex", $"[0:v]{chain}[a];[1:v]{chain}[b];[a][b]hstack=inputs=2",
+            "-filter_complex", $"{black};{white};[a][b]hstack=inputs=2",
             "-update", "1",
             "-frames:v", ((int)SampleAt + 1).ToString(CultureInfo.InvariantCulture),
             outputPath,

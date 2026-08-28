@@ -35,15 +35,52 @@ public sealed record TimerOverlayOptions(int VideoHeight)
     public int BackgroundOpacity { get; init; } = 55;
 
     /// <summary>
-    /// Vertical advance between stacked lines, as a multiple of the text size.
-    /// 1.0 sets the lines flush against each other.
+    /// Line spacing as a multiple of the text size, where 1.0 is the font's own
+    /// line height. Values below 1.0 pull the lines together.
     /// </summary>
-    public double LineSpacing { get; init; } = 1.2;
+    public double LineSpacing { get; init; } = 1.0;
+
+    /// <summary>Outline drawn around the glyphs; 0 disables it.</summary>
+    public int OutlineWidth { get; init; }
+
+    public string OutlineColor { get; init; } = "#000000";
+
+    /// <summary>
+    /// Corner radius of the background, in pixels at the video's own scale.
+    /// Ignored unless a measured box is supplied — see <see cref="BoxWidth"/>.
+    /// </summary>
+    public int CornerRadius { get; init; }
+
+    /// <summary>
+    /// Measured size of the rendered text block, supplied by the caller.
+    /// </summary>
+    /// <remarks>
+    /// Rounded corners cannot come from drawtext, which only draws a square box,
+    /// so the background is composited separately — and that needs a concrete
+    /// size, where drawtext's own box sizes itself from the text at render time.
+    /// Callers that cannot measure leave this zero and get square corners.
+    /// </remarks>
+    public int BoxWidth { get; init; }
+
+    public int BoxHeight { get; init; }
+
+    public int VideoWidth { get; init; }
 
     public int FontSize => Math.Max(1, (int)Math.Round(VideoHeight * TextSizePercent / 100.0));
 
-    /// <summary>Vertical advance between stacked lines, in pixels.</summary>
-    public int LineHeight => Math.Max(1, (int)Math.Round(FontSize * LineSpacing));
+    /// <summary>
+    /// Extra pixels drawtext adds between lines. It advances by the font's own
+    /// line height already, so this is the difference from that, which is
+    /// negative whenever the lines are asked to sit closer than normal.
+    /// </summary>
+    public int LineSpacingPixels => (int)Math.Round(FontSize * (LineSpacing - 1.0));
+
+    /// <summary>Padding between the text and the edge of its background.</summary>
+    public int BoxPadding => Math.Max(4, (int)Math.Round(FontSize * 0.22));
+
+    /// <summary>True when the background is drawn as a composited rounded rect.</summary>
+    public bool UsesRoundedBackground =>
+        Background && CornerRadius > 0 && BoxWidth > 0 && BoxHeight > 0;
 
     public string FontFile => TimerFontCatalog.ResolveFile(FontFamily, Bold);
 }
@@ -113,9 +150,8 @@ public static partial class TimerFiltergraphBuilder
         decimal trimStart,
         TimerOverlayOptions options)
     {
-        string[] lines = (options.Format ?? "")
-            .Replace("\r\n", "\n")
-            .Split('\n');
+        string format = (options.Format ?? "").Replace("\r\n", "\n");
+        string[] lines = format.Split('\n');
 
         var windows = BuildWindows(runStart, runEnd, pauses);
 
@@ -137,30 +173,80 @@ public static partial class TimerFiltergraphBuilder
         }
 
         var filters = new List<string>();
-        int lineIndex = 0;
-        foreach (string line in lines)
+
+        // Every line is emitted inside a single drawtext, separated by real
+        // newlines. drawtext then draws one box around the whole block, which is
+        // what makes tight spacing possible at all: as separate filters each
+        // line carried its own box, and pulling them together composited two
+        // translucent rectangles into a darker band where they met.
+        string prefix = FilterPrefix(options);
+        foreach (var window in Subdivide(windows, format, options.ClockStyle))
         {
-            if (line.Trim().Length == 0)
+            if (!IsVisible(window, trimStart))
             {
-                lineIndex++; // blank lines still occupy a row
                 continue;
             }
-
-            string prefix = FilterPrefix(options, lineIndex, lines.Length);
-            foreach (var window in Subdivide(windows, line, options.ClockStyle))
-            {
-                if (!IsVisible(window, trimStart))
-                {
-                    continue;
-                }
-                string text = RenderLine(line, window, options.ClockStyle, loadlessTotal, realTimeTotal, trimStart);
-                string enable = EnableExpression(window, trimStart);
-                filters.Add($"{prefix}:enable='{enable}':text='{text}'");
-            }
-            lineIndex++;
+            string text = string.Join("\n", lines.Select(line =>
+                RenderLine(line, window, options.ClockStyle, loadlessTotal, realTimeTotal, trimStart)));
+            string enable = EnableExpression(window, trimStart);
+            filters.Add($"{prefix}:enable='{enable}':text='{text}'");
         }
 
         return string.Join(",", filters);
+    }
+
+    /// <summary>
+    /// Wraps a drawtext chain into a complete filtergraph, adding the rounded
+    /// background underneath it when one is configured.
+    /// </summary>
+    /// <remarks>
+    /// drawtext can only draw a square box, so a rounded background is generated
+    /// as its own source and overlaid — which needs two inputs and therefore a
+    /// labelled graph rather than a plain chain.
+    /// </remarks>
+    public static string ComposeGraph(
+        string chain, TimerOverlayOptions options, string inputLabel = "0:v", string outputLabel = "")
+    {
+        string tail = outputLabel.Length > 0 ? $"[{outputLabel}]" : "";
+        if (!options.UsesRoundedBackground)
+        {
+            return $"[{inputLabel}]{chain}{tail}";
+        }
+
+        int width = options.BoxWidth;
+        int height = options.BoxHeight;
+        int radius = Math.Min(options.CornerRadius, Math.Min(width, height) / 2);
+        int alpha = (int)Math.Round(Math.Clamp(options.BackgroundOpacity, 0, 100) / 100.0 * 255);
+        var (red, green, blue) = TimerFontCatalog.Rgb(options.BackgroundColor, "000000");
+        string r = radius.ToString(CultureInfo.InvariantCulture);
+
+        // Rounded-rectangle test: distance from the inset rectangle, which is
+        // zero along the flat edges and grows only inside the corner squares.
+        string inside =
+            $"if(gt(hypot(max(0\\,max({r}-X\\,X-(W-1-{r})))\\,max(0\\,max({r}-Y\\,Y-(H-1-{r})))),{r}),0,{alpha})";
+
+        // A unique-enough label so the graph cannot collide with the caller's.
+        var (x, y) = BoxPosition(options);
+        return
+            $"color=c=black:s={width}x{height}:d=1,format=rgba," +
+            $"geq=r={red}:g={green}:b={blue}:a='{inside}'[crtbox_{inputLabel.Replace(":", "_")}];" +
+            $"[{inputLabel}][crtbox_{inputLabel.Replace(":", "_")}]" +
+            $"overlay=x={x}:y={y}:eof_action=repeat[crtbg_{inputLabel.Replace(":", "_")}];" +
+            $"[crtbg_{inputLabel.Replace(":", "_")}]{chain}{tail}";
+    }
+
+    /// <summary>Margin between the overlay and the edge of the frame.</summary>
+    public const int Margin = 24;
+
+    /// <summary>Top-left corner of the measured background box, in pixels.</summary>
+    private static (string X, string Y) BoxPosition(TimerOverlayOptions options)
+    {
+        string normalized = (options.Corner ?? "").ToLowerInvariant();
+        bool top = normalized.StartsWith("top", StringComparison.Ordinal);
+        bool left = normalized.EndsWith("left", StringComparison.Ordinal);
+
+        string margin = Margin.ToString(CultureInfo.InvariantCulture);
+        return (left ? margin : $"W-w-{margin}", top ? margin : $"H-h-{margin}");
     }
 
     // ── Windows ────────────────────────────────────────────────────────────
@@ -213,15 +299,15 @@ public static partial class TimerFiltergraphBuilder
     /// clocks the line actually uses are considered, so a line showing one clock
     /// is not fragmented by the other one's crossings.
     /// </summary>
-    private static IEnumerable<Window> Subdivide(List<Window> windows, string line, TimerClockStyle style)
+    private static IEnumerable<Window> Subdivide(List<Window> windows, string format, TimerClockStyle style)
     {
         if (style != TimerClockStyle.Compact)
         {
             return windows;
         }
 
-        bool usesLoadless = UsesPlaceholder(line, WithoutLoadsPlaceholder);
-        bool usesRealTime = UsesPlaceholder(line, WithLoadsPlaceholder);
+        bool usesLoadless = UsesPlaceholder(format, WithoutLoadsPlaceholder);
+        bool usesRealTime = UsesPlaceholder(format, WithLoadsPlaceholder);
 
         var result = new List<Window>();
         foreach (var window in windows)
@@ -429,41 +515,74 @@ public static partial class TimerFiltergraphBuilder
 
     // ── Style ──────────────────────────────────────────────────────────────
 
-    private static string FilterPrefix(TimerOverlayOptions options, int lineIndex, int lineCount)
+    private static string FilterPrefix(TimerOverlayOptions options)
     {
         var sb = new StringBuilder("drawtext=fontfile='");
         sb.Append(EscapeColons(options.FontFile));
         sb.Append("':fontsize=").Append(options.FontSize.ToString(CultureInfo.InvariantCulture));
         sb.Append(":fontcolor=").Append(TimerFontCatalog.Color(options.TextColor, "FFFFFF"));
-        if (options.Background)
+
+        if (options.LineSpacingPixels != 0)
+        {
+            sb.Append(":line_spacing=")
+              .Append(options.LineSpacingPixels.ToString(CultureInfo.InvariantCulture));
+        }
+        if (options.OutlineWidth > 0)
+        {
+            sb.Append(":borderw=").Append(options.OutlineWidth.ToString(CultureInfo.InvariantCulture))
+              .Append(":bordercolor=").Append(TimerFontCatalog.Color(options.OutlineColor, "000000"));
+        }
+
+        // drawtext's own box is square, so it is only used when the background
+        // is not being composited as a rounded rectangle underneath.
+        if (options.Background && !options.UsesRoundedBackground)
         {
             sb.Append(":box=1:boxcolor=")
               .Append(TimerFontCatalog.Color(options.BackgroundColor, "000000", options.BackgroundOpacity))
-              .Append(":boxborderw=10");
+              .Append(":boxborderw=").Append(options.BoxPadding.ToString(CultureInfo.InvariantCulture));
         }
-        var (x, y) = CornerPosition(options.Corner, lineIndex, lineCount, options.LineHeight);
+
+        var (x, y) = CornerPosition(options);
         sb.Append(":x=").Append(x).Append(":y=").Append(y);
         return sb.ToString();
     }
 
     /// <summary>
-    /// Places one line in the chosen corner. Lines stack downwards, and bottom
-    /// corners are offset upwards by the remaining lines so the block as a whole
-    /// still sits against the edge.
+    /// Places the whole text block in the chosen corner.
     /// </summary>
-    private static (string X, string Y) CornerPosition(string corner, int lineIndex, int lineCount, int lineHeight)
+    /// <remarks>
+    /// One position now covers every line: drawtext lays the block out itself
+    /// from the newlines and the line spacing, where previously each line was a
+    /// separate filter that had to be offset by hand.
+    /// </remarks>
+    private static (string X, string Y) CornerPosition(TimerOverlayOptions options)
     {
-        string normalized = (corner ?? "").ToLowerInvariant();
+        string normalized = (options.Corner ?? "").ToLowerInvariant();
         bool top = normalized.StartsWith("top", StringComparison.Ordinal);
         bool left = normalized.EndsWith("left", StringComparison.Ordinal);
 
-        string x = left ? "24" : "w-tw-24";
-        int offset = top ? lineIndex * lineHeight : (lineCount - 1 - lineIndex) * lineHeight;
+        if (!options.UsesRoundedBackground)
+        {
+            // drawtext sizes and places its own box, so the text can position
+            // itself from its own width.
+            string edge = Margin.ToString(CultureInfo.InvariantCulture);
+            return (left ? edge : $"w-tw-{edge}", top ? edge : $"h-th-{edge}");
+        }
+
+        // With a composited background the text has to line up inside a box of a
+        // known size, so it is offset from the box's corner rather than from its
+        // own extent — otherwise a clock narrower than the box drifts out of it.
+        int padding = options.BoxPadding;
+        string x = left
+            ? Number(Margin + padding)
+            : $"w-{Number(Margin + options.BoxWidth - padding)}";
         string y = top
-            ? (24 + offset).ToString(CultureInfo.InvariantCulture)
-            : offset == 0 ? "h-th-24" : $"h-th-24-{offset.ToString(CultureInfo.InvariantCulture)}";
+            ? Number(Margin + padding)
+            : $"h-{Number(Margin + options.BoxHeight - padding)}";
         return (x, y);
     }
+
+    private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>Deterministic invariant decimal formatting with trailing zeros trimmed.</summary>
     internal static string Num(decimal value) =>

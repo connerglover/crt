@@ -5,7 +5,7 @@ namespace CRT.Core.Tools;
 
 /// <summary>
 /// Runs the timer-overlay export:
-/// <c>ffmpeg -y -ss trimStart -to trimEnd -i in -vf chain -c:v ENCODER QUALITY -c:a aac -movflags +faststart out.mp4</c>
+/// <c>ffmpeg -y -ss trimStart -to trimEnd -i in -filter_complex graph -map [v] -map 0:a? -c:v ENCODER QUALITY -c:a aac -movflags +faststart out.mp4</c>
 /// with progress parsed from stderr <c>time=</c> against the trimmed duration.
 /// The encoder is whichever <see cref="VideoEncoderCatalog"/> finds, since
 /// libx264 is missing from LGPL ffmpeg builds.
@@ -42,8 +42,14 @@ public sealed partial class FfmpegExporter
     }
 
     /// <summary>Builds the full argv (after the executable) for the export.</summary>
+    /// <remarks>
+    /// filter_complex rather than -vf, because a rounded background is a second
+    /// input overlaid under the text and -vf only takes one. The graph is
+    /// expected to end in [v]; audio is mapped optionally so a silent clip does
+    /// not fail the export.
+    /// </remarks>
     public static IReadOnlyList<string> BuildArguments(
-        string inputPath, string outputPath, decimal trimStart, decimal trimEnd, string filtergraph,
+        string inputPath, string outputPath, decimal trimStart, decimal trimEnd, string filterGraph,
         VideoEncoder? encoder = null)
     {
         encoder ??= VideoEncoderCatalog.Default;
@@ -53,7 +59,9 @@ public sealed partial class FfmpegExporter
             "-ss", TimerFiltergraphBuilder.Num(trimStart),
             "-to", TimerFiltergraphBuilder.Num(trimEnd),
             "-i", inputPath,
-            "-vf", filtergraph,
+            "-filter_complex", filterGraph,
+            "-map", "[v]",
+            "-map", "0:a?",
             "-c:v", encoder.Name,
         };
         arguments.AddRange(encoder.QualityArguments);

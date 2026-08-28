@@ -87,7 +87,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     private double _timerTextSize = 5.5;
 
     [ObservableProperty]
-    private double _timerLineSpacing = 1.2;
+    private double _timerLineSpacing = 0.9;
+
+    [ObservableProperty]
+    private int _timerOutlineWidth;
+
+    [ObservableProperty]
+    private string _timerOutlineColor = "#000000";
+
+    [ObservableProperty]
+    private int _timerCornerRadius = 8;
 
     [ObservableProperty]
     private string _timerTextColor = "#ffffff";
@@ -116,6 +125,36 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public string TimerLineSpacingText =>
         TimerLineSpacing.ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture) + "x";
+
+    public string TimerOutlineWidthText => TimerOutlineWidth == 0
+        ? AppServices.Loc["Off"]
+        : TimerOutlineWidth + " px";
+
+    public string TimerCornerRadiusText => TimerCornerRadius == 0
+        ? AppServices.Loc["Square"]
+        : TimerCornerRadius + " px";
+
+    /// <summary>
+    /// Whether the background's own settings apply. They are meaningless with
+    /// the background switched off, so the UI disables them rather than leaving
+    /// controls that visibly do nothing.
+    /// </summary>
+    public bool BackgroundSettingsEnabled => TimerBackground;
+
+    /// <summary>Outline colour only matters once the outline has a width.</summary>
+    public bool OutlineSettingsEnabled => TimerOutlineWidth > 0;
+
+    partial void OnTimerBackgroundChanged(bool value) =>
+        OnPropertyChanged(nameof(BackgroundSettingsEnabled));
+
+    partial void OnTimerOutlineWidthChanged(int value)
+    {
+        OnPropertyChanged(nameof(TimerOutlineWidthText));
+        OnPropertyChanged(nameof(OutlineSettingsEnabled));
+    }
+
+    partial void OnTimerCornerRadiusChanged(int value) =>
+        OnPropertyChanged(nameof(TimerCornerRadiusText));
 
     partial void OnTimerLineSpacingChanged(double value) => OnPropertyChanged(nameof(TimerLineSpacingText));
 
@@ -202,10 +241,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         ClockStyleIndex = settings.TimerClockStyle switch { "compact" => 0, "full" => 2, _ => 1 };
         _applyingPreset = false;
         SyncPresetSelection();
-        TimerFontIndex = Math.Max(0, TimerFontCatalog.Families.ToList().IndexOf(settings.TimerFontFamily));
+        TimerFontIndex = Math.Max(0, TimerFontOptions.ToList().IndexOf(settings.TimerFontFamily));
         TimerWeightIndex = settings.TimerBold ? 1 : 0;
         TimerTextSize = settings.TimerTextSize;
         TimerLineSpacing = settings.TimerLineSpacing;
+        TimerOutlineWidth = settings.TimerOutlineWidth;
+        TimerOutlineColor = settings.TimerOutlineColor;
+        TimerCornerRadius = settings.TimerCornerRadius;
         TimerTextColor = settings.TimerTextColor;
         TimerBackground = settings.TimerBackground;
         TimerBackgroundColor = settings.TimerBackgroundColor;
@@ -233,11 +275,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         };
         settings.TimerFormat = TimerFormat;
         settings.TimerClockStyle = ClockStyleIndex switch { 0 => "compact", 2 => "full", _ => "fitted" };
-        settings.TimerFontFamily = TimerFontCatalog.Families[
-            Math.Clamp(TimerFontIndex, 0, TimerFontCatalog.Families.Count - 1)];
+        settings.TimerFontFamily = SelectedFontFamily;
         settings.TimerBold = TimerWeightIndex == 1;
         settings.TimerTextSize = TimerTextSize;
         settings.TimerLineSpacing = TimerLineSpacing;
+        settings.TimerOutlineWidth = TimerOutlineWidth;
+        settings.TimerOutlineColor = TimerOutlineColor;
+        settings.TimerCornerRadius = TimerCornerRadius;
         settings.TimerTextColor = TimerTextColor;
         settings.TimerBackground = TimerBackground;
         settings.TimerBackgroundColor = TimerBackgroundColor;
@@ -298,32 +342,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        var options = new TimerOverlayOptions(TimerPreviewRenderer.PaneHeight)
-        {
-            Format = TimerFormat,
-            ClockStyle = ClockStyleIndex switch
-            {
-                0 => Core.Tools.TimerClockStyle.Compact,
-                2 => Core.Tools.TimerClockStyle.Full,
-                _ => Core.Tools.TimerClockStyle.Fitted,
-            },
-            Corner = TimerCornerIndex switch
-            {
-                0 => "top-left",
-                1 => "top-right",
-                2 => "bottom-left",
-                _ => "bottom-right",
-            },
-            FontFamily = TimerFontCatalog.Families[
-                Math.Clamp(TimerFontIndex, 0, TimerFontCatalog.Families.Count - 1)],
-            Bold = TimerWeightIndex == 1,
-            TextSizePercent = TimerTextSize,
-            LineSpacing = TimerLineSpacing,
-            TextColor = TimerTextColor,
-            Background = TimerBackground,
-            BackgroundColor = TimerBackgroundColor,
-            BackgroundOpacity = TimerBackgroundOpacity,
-        };
+        var options = BuildOverlayOptions(TimerPreviewRenderer.PaneHeight);
 
         string output = Path.Combine(AppServices.Paths.BaseDirectory, "timer-preview.png");
         string chain = TimerPreviewRenderer.BuildChain(options);
@@ -333,7 +352,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             result = await Core.Tools.ProcessRunner.RunAsync(
-                ffmpeg, TimerPreviewRenderer.BuildArguments(chain, output));
+                ffmpeg, TimerPreviewRenderer.BuildArguments(chain, output, options));
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -360,6 +379,53 @@ public sealed partial class SettingsViewModel : ObservableObject
         await AppServices.Dialogs.ShowImageAsync(
             AppServices.Loc["Timer Preview"], output, AppServices.Loc["Timer Preview Caption"]);
     }
+
+    /// <summary>
+    /// The overlay options as currently edited, measured so a rounded
+    /// background is sized to the text it sits behind.
+    /// </summary>
+    private TimerOverlayOptions BuildOverlayOptions(int videoHeight)
+    {
+        var options = new TimerOverlayOptions(videoHeight)
+        {
+            Format = TimerFormat,
+            ClockStyle = ClockStyleIndex switch
+            {
+                0 => Core.Tools.TimerClockStyle.Compact,
+                2 => Core.Tools.TimerClockStyle.Full,
+                _ => Core.Tools.TimerClockStyle.Fitted,
+            },
+            Corner = TimerCornerIndex switch
+            {
+                0 => "top-left",
+                1 => "top-right",
+                2 => "bottom-left",
+                _ => "bottom-right",
+            },
+            FontFamily = SelectedFontFamily,
+            Bold = TimerWeightIndex == 1,
+            TextSizePercent = TimerTextSize,
+            LineSpacing = TimerLineSpacing,
+            TextColor = TimerTextColor,
+            Background = TimerBackground,
+            BackgroundColor = TimerBackgroundColor,
+            BackgroundOpacity = TimerBackgroundOpacity,
+            OutlineWidth = TimerOutlineWidth,
+            OutlineColor = TimerOutlineColor,
+            CornerRadius = TimerCornerRadius,
+        };
+
+        if (options.Background && options.CornerRadius > 0)
+        {
+            var (width, height) = TimerTextMeasurer.Measure(options);
+            options = options with { BoxWidth = width, BoxHeight = height };
+        }
+        return options;
+    }
+
+    private string SelectedFontFamily => TimerFontOptions.Count == 0
+        ? TimerFontCatalog.DefaultFamily
+        : TimerFontOptions[Math.Clamp(TimerFontIndex, 0, TimerFontOptions.Count - 1)];
 
     [RelayCommand]
     private void Cancel()
