@@ -1,6 +1,3 @@
-# Standard Library
-from typing import NoReturn
-
 _ENGLISH = {
     "Framerate": "Framerate (FPS)",
     "Start Frame": "Start Frame",
@@ -17,7 +14,6 @@ _ENGLISH = {
     "Copy YouTube Chapters": "Copy YouTube Chapters",
     "Add Loads": "Add Loads",
     "Add Load": "Add Load",
-    "Edit Loads": "Edit Loads",
     "Without Loads": "Without Loads",
     "With Loads": "With Loads",
     "Click to Copy Time": "Click to Copy Time",
@@ -35,13 +31,8 @@ _ENGLISH = {
     "Always on Top": "Always on Top",
     "Help": "Help",
     "About": "About",
-    "Edit Load": "Edit Load",
-    "Save Edits": "Save Edits",
-    "Discard Changes": "Discard Changes",
-    "Edit": "Edit",
     "Delete": "Delete",
     "Loads": "Loads",
-    "File Name": "File Name",
     "Cancel": "Cancel",
     "CRT Settings": "CRT Settings",
     "Automatically Check for Updates": "Automatically Check for Updates",
@@ -80,7 +71,6 @@ _FRENCH = {
     "Copy YouTube Chapters": "Copier les chapitres YouTube",
     "Add Loads": "Ajouter un chargement",
     "Add Load": "Ajouter un chargement",
-    "Edit Loads": "Modifier les chargements",
     "Without Loads": "Sans chargements",
     "With Loads": "Avec chargements",
     "Click to Copy Time": "Cliquer pour copier le temps",
@@ -98,13 +88,8 @@ _FRENCH = {
     "Always on Top": "Toujours au premier plan",
     "Help": "Aide",
     "About": "À propos",
-    "Edit Load": "Modifier les chargement",
-    "Save Edits": "Enregistrer les modifications",
-    "Discard Changes": "Annuler les modifications",
-    "Edit": "Modifier",
     "Delete": "Supprimer",
     "Loads": "Chargements",
-    "File Name": "Nom du fichier",
     "Cancel": "Annuler",
     "CRT Settings": "Paramètres du CRT",
     "Automatically Check for Updates": "Vérifier automatiquement les mises à jours",
@@ -143,7 +128,6 @@ _POLISH = {
     "Copy YouTube Chapters": "Skopiuj rozdziały YouTube",
     "Add Loads": "Dodaj ładowanie",
     "Add Load": "Dodaj ładowanie",
-    "Edit Loads": "Edytuj ładowania",
     "Without Loads": "Bez ładowań",
     "With Loads": "Z ładowaniami",
     "Click to Copy Time": "Kliknij, aby skopiować czas",
@@ -161,13 +145,8 @@ _POLISH = {
     "Always on Top": "Zawsze na wierzchu",
     "Help": "Pomoc",
     "About": "O programie",
-    "Edit Load": "Edytuj ładowanie",
-    "Save Edits": "Zapisz zmiany",
-    "Discard Changes": "Odrzuć zmiany",
-    "Edit": "Edytuj",
     "Delete": "Usuń",
     "Loads": "Ładowania",
-    "File Name": "Nazwa pliku",
     "Cancel": "Anuluj",
     "CRT Settings": "Ustawienia CRT",
     "Automatically Check for Updates": "Automatycznie sprawdzaj aktualizacje",
@@ -206,7 +185,6 @@ _SPANISH = {
     "Copy YouTube Chapters": "Copiar Capítulos de YouTube",
     "Add Loads": "Agregar un Carga",
     "Add Load": "Agregar un Carga",
-    "Edit Loads": "Editar los Cargas",
     "Without Loads": "Sin los Loads",
     "With Loads": "Con los Loads",
     "Click to Copy Time": "Copia el Tiempo",
@@ -224,13 +202,8 @@ _SPANISH = {
     "Always on Top": "Siempre Visible",
     "Help": "Ayuda",
     "About": "Sobre",
-    "Edit Load": "Editar un Carga",
-    "Save Edits": "Guardar Ediciones",
-    "Discard Changes": "Borrar los Modificaciónes",
-    "Edit": "Editar",
     "Delete": "Borrar",
     "Loads": "Cargas",
-    "File Name": "Nombre del Archivo",
     "Cancel": "Cancelar",
     "CRT Settings": "Configuraciónes de CRT",
     "Automatically Check for Updates": "Buscar Actualizaciones Automáticamente",
@@ -253,44 +226,17 @@ _SPANISH = {
     "Duplicate Hotkey Message": "La misma combinación de teclas está asignada a más de una acción: {names}",
 }
 
-# Keyed by the same display names used in the settings language dropdown.
-# Anything else (including the "en" stored by default settings) falls back
-# to English — see Language.__init__.
 LANGUAGES = {
-    "English": _ENGLISH,
-    "Français": _FRENCH,
-    "Polski": _POLISH,
-    "Español": _SPANISH,
+    "en": _ENGLISH,
+    "es": _SPANISH,
+    "fr": _FRENCH,
+    "pl": _POLISH,
 }
 
+# Display names for the settings dropdown, keyed by the code stored in the config.
+LANGUAGE_NAMES = {"en": "English", "es": "Español", "fr": "Français", "pl": "Polski"}
 
-class Language:
-    def __init__(self, language: str) -> NoReturn:
-        """Initializes the language object.
 
-        Args:
-            language (str): The language.
-        """
-        self.language = language
-        self.content = LANGUAGES.get(language, _ENGLISH)
-
-    def translate(self, from_lang: str, to_lang: str, text: str) -> str:
-        """
-        Translates text from one language to another using language content dictionaries.
-
-        Args:
-            from_lang (str): The language to translate from.
-            to_lang (str): The language to translate to.
-            text (str): The text to translate.
-
-        Returns:
-            str: The translated text.
-        """
-        source = LANGUAGES.get(from_lang, _ENGLISH)
-        target = LANGUAGES.get(to_lang, _ENGLISH)
-
-        try:
-            key = next(k for k, v in source.items() if v == text)
-            return target[key]
-        except StopIteration:
-            return text  # Return original text if translation not found
+def content_for(language: str) -> dict:
+    """Returns the content dict for a language code, English for anything unknown."""
+    return LANGUAGES.get(language, _ENGLISH)

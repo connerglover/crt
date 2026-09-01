@@ -1,7 +1,8 @@
 # Standard library
 import json
 import re
-from decimal import Decimal as d, InvalidOperation
+from decimal import Decimal as d
+from typing import Optional
 
 
 def is_debug_info(text: str) -> bool:
@@ -9,42 +10,44 @@ def is_debug_info(text: str) -> bool:
     return '{' in text and '"cmt"' in text
 
 
+def parse_debug_info(text: str) -> Optional[dict]:
+    """Parses the JSON object out of a YouTube debug info blob.
+
+    Returns None if the text holds no object or isn't valid JSON.
+    """
+    start_pos = text.find('{')
+    if start_pos == -1:
+        return None
+    try:
+        return json.loads(text[start_pos:])
+    except json.decoder.JSONDecodeError:
+        return None
+
+
 def debug_info_to_frame(framerate: d, debug_info: str) -> int:
     """Converts YouTube debug info JSON to a frame number."""
-    start_pos = debug_info.find('{')
-    if start_pos == -1:
+    parsed = parse_debug_info(debug_info)
+    if parsed is None or "cmt" not in parsed:
         raise ValueError("The debug info provided is invalid.\nPlease re-enter debug info.")
-    debug_info = debug_info[start_pos:]
-    try:
-        parsed = json.loads(debug_info)
-        cmt = parsed["cmt"]
-    except (json.decoder.JSONDecodeError, KeyError):
-        raise ValueError("The debug info provided is invalid.\nPlease re-enter debug info.")
-    return int(round(d(str(cmt)) * d(str(framerate)), 0))
+    return int(round(d(str(parsed["cmt"])) * d(str(framerate)), 0))
+
+
+def _clean_number(text: str) -> str:
+    """Strips everything but digits and the first decimal point.
+
+    Returns "" if no digit survives, so callers can treat that as "no value".
+    """
+    cleaned = re.sub(r'[^0-9.]', '', text)
+    if not re.search(r'[0-9]', cleaned):
+        return ""
+    head, dot, tail = cleaned.partition(".")
+    return head + dot + tail.replace(".", "")
 
 
 def clean_framerate(framerate: str) -> d:
-    """Cleans a framerate string into a valid Decimal.
-
-    Rules:
-    - Strip all non-numeric, non-decimal characters.
-    - If empty or no digits remain, return Decimal('0').
-    - Collapse multiple decimal points (keep only the first).
-    - Trailing decimal point gets a '0' appended.
-    """
-    cleaned = re.sub(r'[^0-9.]', '', framerate)
-    if not re.search(r'[0-9]', cleaned):
-        return d('0')
-    # Collapse multiple decimal points
-    if cleaned.count('.') > 1:
-        idx = cleaned.find('.')
-        cleaned = cleaned[:idx + 1] + cleaned[idx + 1:].replace('.', '')
-    if cleaned.endswith('.'):
-        cleaned += '0'
-    try:
-        return d(cleaned)
-    except (InvalidOperation, ValueError):
-        return d('0')
+    """Cleans a framerate string into a valid Decimal, Decimal("0") if there's no number in it."""
+    cleaned = _clean_number(framerate)
+    return d(cleaned) if cleaned else d('0')
 
 
 def parse_frame_input(text: str, framerate: d) -> int:
@@ -59,34 +62,16 @@ def parse_frame_input(text: str, framerate: d) -> int:
     """
     text = text.strip()
 
-    # Step 1 — debug info
     if is_debug_info(text):
         return debug_info_to_frame(framerate, text)
 
-    # Step 2 — strip non-numeric/non-decimal characters
-    cleaned = re.sub(r'[^0-9.]', '', text)
-
-    # Step 3 — empty → 0
-    if not cleaned or not re.search(r'[0-9]', cleaned):
+    cleaned = _clean_number(text)
+    if not cleaned:
         return 0
 
-    # Collapse multiple decimal points
-    if cleaned.count('.') > 1:
-        idx = cleaned.find('.')
-        cleaned = cleaned[:idx + 1] + cleaned[idx + 1:].replace('.', '')
-
-    # Step 4 — decimal → timestamp conversion
+    # A decimal point means the user typed a timestamp in seconds, not a frame.
     if '.' in cleaned:
-        try:
-            fps = d(str(framerate))
-            if fps == 0:
-                return 0
-            return int(round(d(cleaned) * fps, 0))
-        except (InvalidOperation, ValueError):
-            return 0
+        fps = d(str(framerate))
+        return int(round(d(cleaned) * fps, 0)) if fps else 0
 
-    # Step 5 — plain integer
-    try:
-        return int(cleaned)
-    except ValueError:
-        return 0
+    return int(cleaned)

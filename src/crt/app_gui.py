@@ -5,7 +5,7 @@ from decimal import Decimal as d
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QToolButton, QFrame, QMenuBar, QMenu,
-    QSizePolicy, QApplication, QSplitter, QScrollArea
+    QSizePolicy, QApplication, QSplitter, QScrollArea, QLayout
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
@@ -34,18 +34,17 @@ class LoadSidebarRow(QWidget):
     edited = Signal(int)
     delete_requested = Signal(int)
 
-    def __init__(self, index: int, load, framerate: d, precision: int, content: dict, parent=None):
+    def __init__(self, index: int, load, framerate: d, content: dict, parent=None):
         super().__init__(parent)
         self.index = index
         self.load = load
         self.framerate = framerate
-        self.precision = precision
         self.content = content
         self._build_ui()
 
     def _duration_str(self) -> str:
         try:
-            return format_frame_time(self.load.length, self.framerate, self.precision)
+            return format_frame_time(self.load.length, self.framerate)
         except Exception:
             return "0"
 
@@ -119,9 +118,6 @@ class MainWindow(QMainWindow):
     load_delete_requested = Signal(int)
     update_link_clicked = Signal()
 
-    _BASE_WIDTH = 780
-    _BASE_HEIGHT = 494
-    _UPDATE_BANNER_HEIGHT = 34
     _DEFAULT_MAIN_PANEL_WIDTH = 460
     _DEFAULT_LOADS_PANEL_WIDTH = 260
 
@@ -132,11 +128,11 @@ class MainWindow(QMainWindow):
         self._load_rows: dict[int, LoadSidebarRow] = {}
         self._update_banner_visible = False
         self._loads_collapsed = False
-        self._main_panel_width = self._DEFAULT_MAIN_PANEL_WIDTH
-        self._loads_panel_width = self._DEFAULT_LOADS_PANEL_WIDTH
         self.setWindowTitle("Conner's Retime Tool")
         self._build_ui()
-        self.setFixedSize(self._BASE_WIDTH, self._BASE_HEIGHT)
+        # Qt keeps the window pinned to its layout's natural size and re-fits it
+        # whenever the update banner or loads panel is shown/hidden.
+        self.layout().setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
     def _build_ui(self):
         c = self.content
@@ -257,7 +253,7 @@ class MainWindow(QMainWindow):
         root.addSpacing(10)
 
         # ── Input rows ────────────────────────────────────────────────────────
-        self._inputs = {}
+        self.inputs = {}
         rows = [
             ("framerate",   c["Framerate"],           "60", False),
             ("start",       c["Start Frame"],         "0",  True),
@@ -371,7 +367,7 @@ class MainWindow(QMainWindow):
 
         return panel
 
-    def refresh_loads(self, loads: list, framerate: d, precision: int, content: dict):
+    def refresh_loads(self, loads: list, framerate: d, content: dict):
         """Rebuilds the sidebar's load rows to match the given list of loads."""
         for row in self._load_rows.values():
             row.setParent(None)
@@ -379,7 +375,7 @@ class MainWindow(QMainWindow):
         self._load_rows.clear()
 
         for index, load in enumerate(loads):
-            row = LoadSidebarRow(index, load, framerate, precision, content, self._loads_list_widget)
+            row = LoadSidebarRow(index, load, framerate, content, self._loads_list_widget)
             row.edited.connect(self._on_load_row_edited)
             row.delete_requested.connect(self.load_delete_requested.emit)
             self._loads_list_layout.insertWidget(self._loads_list_layout.count() - 1, row)
@@ -403,7 +399,7 @@ class MainWindow(QMainWindow):
         """Builds the dismissible update-available bar shown above the main panel."""
         banner = QWidget()
         banner.setProperty("cssClass", "update-banner")
-        banner.setFixedHeight(self._UPDATE_BANNER_HEIGHT)
+        banner.setFixedHeight(34)
         banner.setVisible(False)
 
         layout = QHBoxLayout(banner)
@@ -440,47 +436,25 @@ class MainWindow(QMainWindow):
         if not self._update_banner_visible:
             self._update_banner_visible = True
             self.update_banner.setVisible(True)
-            self._apply_fixed_size()
 
     def hide_update_banner(self) -> None:
         """Hides the update banner, shrinking the window back to its base size."""
         if self._update_banner_visible:
             self._update_banner_visible = False
             self.update_banner.setVisible(False)
-            self._apply_fixed_size()
 
     def toggle_loads_panel(self) -> None:
-        """Shows or hides the loads sidebar, shrinking/growing the window to fit.
+        """Shows or hides the loads sidebar. The window re-fits itself around it."""
+        self._loads_collapsed = not self._loads_collapsed
+        self.loads_panel.setVisible(not self._loads_collapsed)
+        if not self._loads_collapsed:
+            self.splitter.setSizes(
+                [self._DEFAULT_MAIN_PANEL_WIDTH, self._DEFAULT_LOADS_PANEL_WIDTH]
+            )
 
-        The main panel is pinned to its current width while collapsed so it
-        doesn't stretch to fill the space freed by hiding the loads panel —
-        otherwise the splitter reflows it and everything inside visibly shifts.
-        """
-        if self._loads_collapsed:
-            self._loads_collapsed = False
-            self.main_panel.setMinimumWidth(420)
-            self.main_panel.setMaximumWidth(16_777_215)  # Qt's QWIDGETSIZE_MAX
-            self.loads_panel.setVisible(True)
-            self.splitter.setSizes([self._main_panel_width, self._loads_panel_width])
-            self.loads_toggle_btn.setText("◂")
-            self.loads_toggle_btn.setToolTip(self.content.get("Collapse Loads Panel", "Collapse Loads Panel"))
-        else:
-            sizes = self.splitter.sizes()
-            if len(sizes) == 2 and sizes[1] > 0:
-                self._main_panel_width = sizes[0]
-                self._loads_panel_width = sizes[1]
-            self._loads_collapsed = True
-            self.main_panel.setFixedWidth(self._main_panel_width)
-            self.loads_panel.setVisible(False)
-            self.loads_toggle_btn.setText("▸")
-            self.loads_toggle_btn.setToolTip(self.content.get("Expand Loads Panel", "Expand Loads Panel"))
-        self._apply_fixed_size()
-
-    def _apply_fixed_size(self) -> None:
-        """Recomputes the window's fixed size from the update banner and loads panel state."""
-        width = self._BASE_WIDTH - (self._loads_panel_width if self._loads_collapsed else 0)
-        height = self._BASE_HEIGHT + (self._UPDATE_BANNER_HEIGHT if self._update_banner_visible else 0)
-        self.setFixedSize(width, height)
+        self.loads_toggle_btn.setText("▸" if self._loads_collapsed else "◂")
+        key = "Expand Loads Panel" if self._loads_collapsed else "Collapse Loads Panel"
+        self.loads_toggle_btn.setToolTip(self.content.get(key, key))
 
     def _add_action(self, menu: QMenu, text: str, key: str) -> QAction:
         """Creates a menu entry and registers it in menu_actions under its action id.
@@ -542,7 +516,7 @@ class MainWindow(QMainWindow):
         inp.setFixedHeight(32)
         inp.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         row.addWidget(inp)
-        self._inputs[key] = inp
+        self.inputs[key] = inp
 
         if show_paste:
             paste_btn = QPushButton(paste_label)

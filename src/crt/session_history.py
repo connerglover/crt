@@ -1,5 +1,4 @@
 # Standard Library
-from typing import NoReturn
 
 # Third-party
 from PySide6.QtWidgets import (
@@ -36,7 +35,7 @@ class SessionHistoryDialog(QDialog):
         self.list_widget.itemActivated.connect(self._pick)
         self.list_widget.itemDoubleClicked.connect(self._pick)
 
-    def _pick(self, item: QListWidgetItem) -> NoReturn:
+    def _pick(self, item: QListWidgetItem) -> None:
         """Accepts the dialog with the double-clicked/activated path."""
         self._selected = item.text()
         self.accept()

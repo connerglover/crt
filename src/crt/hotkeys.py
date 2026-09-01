@@ -1,3 +1,13 @@
+"""Central registry of user-customizable hotkey actions.
+
+Each entry is (action_id, label_content_key, default_shortcut):
+  - action_id: the key into crt.app.App._action_handlers(), and into
+    MainWindow.menu_actions for the menu-backed ones.
+  - label_content_key: key into the language content dict for the row label
+    shown in the hotkeys editor.
+  - default_shortcut: default Qt key sequence string (e.g. "Ctrl+S").
+"""
+
 # Third-party
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QKeySequenceEdit,
@@ -7,8 +17,29 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QKeySequence
 
 # Local application
-from crt.hotkeys.app import HOTKEY_ACTIONS
 from crt.popups import popup_error as _popup_error
+
+
+HOTKEY_ACTIONS = [
+    ("New Time", "New Time", "Ctrl+N"),
+    ("Open Time", "Open Time", "Ctrl+O"),
+    ("Session History", "Session History", "Ctrl+H"),
+    ("Save", "Save", "Ctrl+S"),
+    ("Save As", "Save As", "Ctrl+Shift+S"),
+    ("Settings", "Settings", "Ctrl+,"),
+    ("Copy Mod Note", "Copy Mod Note", "Ctrl+M"),
+    ("Copy Discord Message", "Copy Discord Message", "Ctrl+Shift+D"),
+    ("Copy YouTube Chapters", "Copy YouTube Chapters", "Ctrl+Shift+Y"),
+    ("Clear Loads", "Clear Loads", "Ctrl+Shift+L"),
+    ("start_paste", "Paste Start Frame", "Ctrl+1"),
+    ("end_paste", "Paste End Frame", "Ctrl+2"),
+    ("start_loads_paste", "Paste Start Frame (Loads)", "Ctrl+3"),
+    ("end_loads_paste", "Paste End Frame (Loads)", "Ctrl+4"),
+    ("Add Loads", "Add Load", "Ctrl+L"),
+]
+
+DEFAULT_HOTKEYS = {action_id: default for action_id, _, default in HOTKEY_ACTIONS}
+
 
 _LABEL_KEYS = {action_id: label_key for action_id, label_key, _ in HOTKEY_ACTIONS}
 

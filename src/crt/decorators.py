@@ -3,6 +3,8 @@ from decimal import Decimal as d
 from functools import wraps
 from typing import Callable, Tuple
 
+PRECISION = 3  # Decimal places every displayed time is rounded to.
+
 def error_handler(func: Callable) -> Callable:
     """Handles errors by showing popup rather than crashing the program.
 
@@ -19,32 +21,6 @@ def error_handler(func: Callable) -> Callable:
         except Exception as e:
             self._show_error(str(e))
             return None
-    return wrapper
-
-def validate_load(func: Callable) -> Callable:
-    """Validates the load.
-
-    Args:
-        func (Callable): The function to wrap. 
-
-    Raises:
-        ValueError: The duration of the code is 0.000
-        ValueError: The load time ends before it starts.
-
-    Returns:
-        Callable: The function containing the validated loads.
-    """    
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        start_frame = kwargs.get('start_frame', args[0] if args else None)
-        end_frame = kwargs.get('end_frame', args[1] if len(args) > 1 else None)
-        
-        if start_frame is not None and end_frame is not None:
-            if start_frame == end_frame:
-                raise ValueError("The duration of the load is 0.000")
-            if start_frame > end_frame:
-                raise ValueError("The load time ends before it starts.")
-        return func(self, *args, **kwargs)
     return wrapper
 
 def format_components(time: d) -> Tuple[str, str, str, str]:
@@ -91,33 +67,16 @@ def format_iso(time: d) -> str:
         return f"{minutes}:{seconds}.{ms}"
     return f"{seconds}.{ms}"
 
-def format_frame_time(frames: int, framerate: d, precision: int) -> str:
+def format_frame_time(frames: int, framerate: d) -> str:
     """Converts a frame count/position at the given framerate into an ISO-style timestamp.
 
     Args:
         frames (int): A frame count (duration) or absolute frame position.
         framerate (d): The framerate to convert with.
-        precision (int): Decimal places to round the resulting seconds to.
 
     Returns:
         str: The formatted time, e.g. "01:15.000". "0.000" if framerate is falsy.
     """
     if not framerate:
         return format_iso(d(0))
-    return format_iso(round(d(frames) / d(framerate), precision))
-
-def format_time(func: Callable) -> Callable:
-    """Pre-formats time into hours, minutes, seconds, and milliseconds.
-
-    Args:
-        func (Callable): Function to wrap.
-
-    Returns:
-        Callable: Function containing the formatted time.
-    """
-    @wraps(func)
-    def wrapper(self, loads: bool = False) -> str:
-        time_value = self.without_loads if loads else self.with_loads
-        hours, minutes, seconds, ms = format_components(time_value)
-        return func(self, hours, minutes, seconds, ms)
-    return wrapper
+    return format_iso(round(d(frames) / d(framerate), PRECISION))

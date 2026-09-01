@@ -1,59 +1,15 @@
-﻿# Standard library
-import sys
+﻿# Third-party
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
 
 
 def is_dark_mode() -> bool:
-    """Detects whether the OS is using a dark theme.
-
-    Reads the Windows registry directly instead of depending on the
-    third-party `darkdetect` package, which pulls in a platform-specific
-    submodule (`_windows_detect`) that's easy to lose track of â€” either
-    it's missing because dependencies weren't installed, or PyInstaller's
-    static import analysis fails to bundle it into the frozen exe.
-    Falls back to light mode on any failure or on non-Windows platforms.
-    """
-    if sys.platform != "win32":
-        return False
-    try:
-        import winreg
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-        )
-        value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-        return value == 0
-    except OSError:
-        return False
+    """Reports whether the OS is using a dark theme."""
+    return QApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
 
 
 DEFAULT_ACCENT_COLOR = "#5b9bd5"
-
-
-def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-    """Converts a "#rrggbb" hex string into an (r, g, b) tuple."""
-    hex_color = hex_color.lstrip("#")
-    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
-
-
-def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
-    """Converts an (r, g, b) tuple into a "#rrggbb" hex string."""
-    return "#{:02x}{:02x}{:02x}".format(*(max(0, min(255, c)) for c in rgb))
-
-
-def _lighten(hex_color: str, amount: float = 0.2) -> str:
-    """Blends a hex color toward white by `amount` (0-1), for hover states."""
-    r, g, b = _hex_to_rgb(hex_color)
-    return _rgb_to_hex((
-        round(r + (255 - r) * amount),
-        round(g + (255 - g) * amount),
-        round(b + (255 - b) * amount),
-    ))
-
-
-def _darken(hex_color: str, amount: float = 0.22) -> str:
-    """Blends a hex color toward black by `amount` (0-1), for pressed states."""
-    r, g, b = _hex_to_rgb(hex_color)
-    return _rgb_to_hex((round(r * (1 - amount)), round(g * (1 - amount)), round(b * (1 - amount))))
 
 
 DARK_COLORS = {
@@ -455,8 +411,8 @@ def _render(colors: dict[str, str], accent: str) -> str:
     qss = PALETTE
     for token, value in (
         *colors.items(),
-        ("__ACCENT_HOVER__", _lighten(accent)),
-        ("__ACCENT_PRESSED__", _darken(accent)),
+        ("__ACCENT_HOVER__", QColor(accent).lighter(120).name()),
+        ("__ACCENT_PRESSED__", QColor(accent).darker(128).name()),
         ("__ACCENT__", accent),
     ):
         qss = qss.replace(token, value)

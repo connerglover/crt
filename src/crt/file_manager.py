@@ -1,7 +1,7 @@
 # Standard library
 import json
 from decimal import Decimal as d, InvalidOperation
-from typing import NoReturn, Optional
+from typing import Optional
 
 # Local application
 from crt.load import Load
@@ -15,7 +15,7 @@ class FileManager:
     user to save before a destructive action (new/open/switch).
     """
 
-    def __init__(self) -> NoReturn:
+    def __init__(self) -> None:
         self.time = Time()
         self.file_path: Optional[str] = None
         self.past_file_paths: list = []
@@ -25,7 +25,7 @@ class FileManager:
         """Past file paths, excluding whichever file is currently active."""
         return [p for p in self.past_file_paths if p != self.file_path]
 
-    def _remember_past_path(self, path: Optional[str]) -> NoReturn:
+    def _remember_past_path(self, path: Optional[str]) -> None:
         """Adds a file path to history, keeping it free of duplicates and the active file."""
         if path and path != self.file_path and path not in self.past_file_paths:
             self.past_file_paths.append(path)
@@ -54,7 +54,7 @@ class FileManager:
             "loads": [(load.start_frame, load.end_frame) for load in self.time.loads]
         }
 
-    def load_file(self, path: str) -> NoReturn:
+    def load_file(self, path: str) -> None:
         """Loads a time file from disk into the current session."""
         with open(path, "r") as file:
             try:
@@ -64,11 +64,9 @@ class FileManager:
 
         old_file_path = self.file_path
 
-        self.time.mutate(
-            start_frame=file_data["start_frame"],
-            end_frame=file_data["end_frame"],
-            framerate=self._parse_framerate(file_data["framerate"])
-        )
+        self.time.start_frame = file_data["start_frame"]
+        self.time.end_frame = file_data["end_frame"]
+        self.time.framerate = self._parse_framerate(file_data["framerate"])
         self.time.loads = [Load(load[0], load[1]) for load in file_data["loads"]]
 
         self.file_path = path
@@ -77,7 +75,7 @@ class FileManager:
             self.past_file_paths.remove(path)
         self._remember_past_path(old_file_path)
 
-    def new_time(self) -> NoReturn:
+    def new_time(self) -> None:
         """Starts a blank time, remembering the previous file in history."""
         old_file_path = self.file_path
         self.file_path = None
@@ -85,7 +83,7 @@ class FileManager:
         self.dirty = False
         self._remember_past_path(old_file_path)
 
-    def save(self) -> NoReturn:
+    def save(self) -> None:
         """Saves to the current file path. Raises if there isn't one yet."""
         if not self.file_path:
             raise ValueError("No file path set — use save_as() first.")
@@ -93,11 +91,9 @@ class FileManager:
             json.dump(self.to_dict(), file)
         self.dirty = False
 
-    def save_as(self, path: str) -> NoReturn:
+    def save_as(self, path: str) -> None:
         """Saves to a new file path, remembering the previous one in history."""
         old_file_path = self.file_path
         self.file_path = path
-        with open(self.file_path, "w") as file:
-            json.dump(self.to_dict(), file)
-        self.dirty = False
+        self.save()
         self._remember_past_path(old_file_path)

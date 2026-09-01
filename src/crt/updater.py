@@ -1,9 +1,7 @@
 # Standard library
+import json
 from typing import Optional
-from webbrowser import open as open_url
-
-# Third-party
-from requests import get as get_url
+from urllib.request import urlopen
 
 # Local application
 from crt._version import __version__
@@ -22,20 +20,12 @@ def check_for_updates() -> Optional[str]:
             otherwise None.
     """
     try:
-        response = get_url(
-            "https://api.github.com/repos/connerglover/crt/releases/latest",
-            timeout=5
-        )
-        if response.status_code == 200:
-            latest_release = response.json()
-            latest_version = latest_release["tag_name"]
-            if str(latest_version) != str(__version__):
-                return str(latest_version)
+        with urlopen(
+            "https://api.github.com/repos/connerglover/crt/releases/latest", timeout=5
+        ) as response:
+            latest_version = json.load(response)["tag_name"]
+        if str(latest_version) != str(__version__):
+            return str(latest_version)
     except Exception:
         pass
     return None
-
-
-def open_releases_page() -> None:
-    """Opens the latest release page in the default browser."""
-    open_url(RELEASES_URL)

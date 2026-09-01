@@ -1,31 +1,31 @@
 # Standard library
 import sys
+from webbrowser import open as open_url
 from decimal import InvalidOperation, DivisionByZero, DivisionUndefined
 from pathlib import Path
-from typing import NoReturn
 
 # Third-party
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QLineEdit, QPushButton
+    QApplication, QFileDialog, QPushButton
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QShortcut
 
 # Local application
 from crt._version import __version__
-from crt.app.gui import ClickableLabel, MainWindow
-from crt.app_settings.app import Settings
-from crt.decorators import error_handler, format_components, format_frame_time
+from crt.app_gui import MainWindow
+from crt.settings import Settings
+from crt.decorators import PRECISION, error_handler, format_components, format_frame_time
 from crt.file_manager import FileManager
 from crt.frame_input import clean_framerate, is_debug_info, parse_frame_input
-from crt.hotkeys import DEFAULT_HOTKEYS, HOTKEY_ACTIONS, MENU_ACTION_IDS
+from crt.hotkeys import DEFAULT_HOTKEYS, HOTKEY_ACTIONS
 from crt.popups import (
     popup_yes_no as _popup_yes_no, popup_yes_no_cancel as _popup_yes_no_cancel,
     popup_ok as _popup_ok, popup_error as _popup_error
 )
 from crt.session_history import SessionHistoryDialog
 from crt.theme import stylesheet_for
-from crt.updater import check_for_updates, open_releases_page
+from crt.updater import RELEASES_URL, check_for_updates
 from crt.youtube_format import extract_debug_info_ids, get_format_framerate
 
 
@@ -57,10 +57,13 @@ def _clipboard_set(text: str):
 class App:
     """Main application for CRT."""
 
-    def __init__(self) -> NoReturn:
+    def __init__(self) -> None:
         """Initializes the App class."""
         # QApplication must exist before any Qt widgets
         self._qt_app = QApplication.instance() or QApplication([])
+        # Names QStandardPaths uses to resolve the config directory.
+        QApplication.setOrganizationName("CRT")
+        QApplication.setApplicationName("CRT")
 
         icon_path = _icon_path()
         if Path(icon_path).exists():
@@ -71,24 +74,17 @@ class App:
         self.settings = Settings()
         self.settings_dict = self.settings.config_to_dict()
 
-        # Load stats tracking
-        self._load_stats = {
-            'total_loads': 0,
-            'avg_length': 0
-        }
-
         # (video_id, format_id) pairs the user has already been prompted about,
         # so pasting debug info for the same video twice (start + end frame)
         # doesn't ask about a framerate mismatch more than once per session.
         self._framerate_prompt_seen = set()
 
-        # Apply theme via stylesheet
-        self._apply_theme(self.settings_dict["theme"], self.settings_dict["accent_color"])
+        self._qt_app.setStyleSheet(
+            stylesheet_for(self.settings_dict["theme"], self.settings_dict["accent_color"])
+        )
 
-        self.language = self.settings.language
-        self.window = MainWindow(self.language.content)
-        if Path(icon_path).exists():
-            self.window.setWindowIcon(QIcon(icon_path))
+        self.content = self.settings.content
+        self.window = MainWindow(self.content)
 
         # Enabled by default. Set the flag directly rather than via
         # _set_always_on_top(), which calls win.show() to reapply the flag on an
@@ -99,7 +95,7 @@ class App:
         self.window.action_always_on_top.setChecked(True)
         self.window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
 
-        self.window.update_link_clicked.connect(open_releases_page)
+        self.window.update_link_clicked.connect(lambda: open_url(RELEASES_URL))
 
         if self.settings_dict["enable_updates"]:
             self._check_for_updates()
@@ -111,12 +107,8 @@ class App:
         # visible jump. Refresh once up front so the sidebar starts in its final state.
         self._refresh_load_sidebar()
 
-    def _apply_theme(self, theme: str, accent_color: str):
-        """Applies a Qt stylesheet theme."""
-        self._qt_app.setStyleSheet(stylesheet_for(theme, accent_color))
-
     @error_handler
-    def _on_load_edited(self, index: int, start_text: str, end_text: str) -> NoReturn:
+    def _on_load_edited(self, index: int, start_text: str, end_text: str) -> None:
         """Handles an inline edit to a load row in the sidebar."""
         time = self.files.time
         if index >= len(time.loads):
@@ -127,7 +119,7 @@ class App:
         self.files.dirty = True
         self._update_displays()
 
-    def _on_load_deleted(self, index: int) -> NoReturn:
+    def _on_load_deleted(self, index: int) -> None:
         """Handles a delete request from a load row in the sidebar."""
         time = self.files.time
         if 0 <= index < len(time.loads):
@@ -136,26 +128,18 @@ class App:
         self._update_displays()
 
     @error_handler
-    def _add_loads(self) -> NoReturn:
+    def _add_loads(self) -> None:
         """Adds the loads."""
         start_frame = int(self._get_input("start_loads") or 0)
         end_frame = int(self._get_input("end_loads") or 0)
         time = self.files.time
 
-        if time.loads:
-            if self._load_stats['total_loads'] != len(time.loads):
-                self._load_stats['avg_length'] = (
-                    sum(load.end_frame - load.start_frame for load in time.loads)
-                    / len(time.loads)
-                )
-                self._load_stats['total_loads'] = len(time.loads)
-
-            if (end_frame - start_frame) > self._load_stats['avg_length'] * 10:
-                if not _popup_yes_no(
-                    "Woah!", "This load is concerningly long. Would you like to add the load anyway?",
-                    self.window, self._always_on_top
-                ):
-                    return
+        if time.loads and (end_frame - start_frame) > time.average_load_length * 10:
+            if not _popup_yes_no(
+                "Woah!", "This load is concerningly long. Would you like to add the load anyway?",
+                self.window, self._always_on_top
+            ):
+                return
 
         time.add_load(start_frame, end_frame)
         self.files.dirty = True
@@ -164,28 +148,28 @@ class App:
         self._update_displays()
         _popup_ok("Loads", "Load added successfully.", self.window, self._always_on_top)
 
-    def _clear_loads(self) -> NoReturn:
+    def _clear_loads(self) -> None:
         """Clears every load from the active session."""
-        self.files.time.clear_loads()
+        self.files.time.loads.clear()
         self.files.dirty = True
         self._update_displays()
 
     @error_handler
-    def _copy_mod_note(self) -> NoReturn:
+    def _copy_mod_note(self) -> None:
         """Copies the mod note to the clipboard."""
         _clipboard_set(self._mod_note)
 
     @error_handler
-    def _copy_discord_message(self) -> NoReturn:
+    def _copy_discord_message(self) -> None:
         """Copies the Discord summary to the clipboard."""
         _clipboard_set(self._discord_message)
 
     @error_handler
-    def _copy_youtube_chapters(self) -> NoReturn:
+    def _copy_youtube_chapters(self) -> None:
         """Copies the YouTube chapters list to the clipboard."""
         _clipboard_set(self._youtube_chapters)
 
-    def _about(self) -> NoReturn:
+    def _about(self) -> None:
         """Shows the about popup."""
         _popup_ok(
             "About",
@@ -205,7 +189,7 @@ class App:
             self._confirm_framerate_from_debug_info(text)
         return parse_frame_input(text, self.files.time.framerate)
 
-    def _confirm_framerate_from_debug_info(self, debug_info: str) -> NoReturn:
+    def _confirm_framerate_from_debug_info(self, debug_info: str) -> None:
         """Offers to correct the session's framerate before it's used to convert
         pasted YouTube debug info into a frame number.
 
@@ -246,49 +230,43 @@ class App:
     # ── Widget accessors ───────────────────────────────────────────────────────
 
     def _set_input(self, key: str, value: str):
-        """Updates a QLineEdit in the main window by object name."""
-        widget = self.window.findChild(QLineEdit, key)
-        if widget:
-            widget.blockSignals(True)
-            widget.setText(str(value))
-            widget.blockSignals(False)
+        """Updates one of the main window's input fields."""
+        widget = self.window.inputs[key]
+        widget.blockSignals(True)
+        widget.setText(str(value))
+        widget.blockSignals(False)
 
     def _get_input(self, key: str) -> str:
-        """Gets the text of a QLineEdit in the main window by object name."""
-        widget = self.window.findChild(QLineEdit, key)
-        return widget.text() if widget else ""
+        """Gets the text of one of the main window's input fields."""
+        return self.window.inputs[key].text()
 
     # ── Input event handlers ───────────────────────────────────────────────────
 
-    def _set_framerate(self, new_value: str) -> NoReturn:
+    def _set_framerate(self, new_value: str) -> None:
         """Handles the framerate input."""
         framerate = clean_framerate(new_value)
         self._set_input("framerate", str(framerate))
-        self.files.time.mutate(framerate=framerate)
+        self.files.time.framerate = framerate
         self.files.dirty = True
         self._update_displays()
 
     @error_handler
-    def _set_time(self, key: str, new_value: str) -> NoReturn:
+    def _set_time(self, key: str, new_value: str) -> None:
         """Handles the start/end frame inputs."""
         frame = self._parse_frame(new_value)
         match key:
             case "start":
-                self.files.time.mutate(start_frame=frame)
+                self.files.time.start_frame = frame
             case "end":
-                self.files.time.mutate(end_frame=frame)
+                self.files.time.end_frame = frame
         self.files.dirty = True
         self._set_input(key, frame)
         self._update_displays()
 
-    def _set_loads(self, key: str, new_value: str) -> NoReturn:
+    @error_handler
+    def _set_loads(self, key: str, new_value: str) -> None:
         """Handles the loads start/end frame inputs."""
-        try:
-            frame = self._parse_frame(new_value)
-        except ValueError as e:
-            frame = 0
-            self._show_error(e)
-        self._set_input(key, frame)
+        self._set_input(key, self._parse_frame(new_value))
 
     # ── File operations ────────────────────────────────────────────────────────
 
@@ -321,7 +299,7 @@ class App:
         self._save_time()
         return not self.files.dirty
 
-    def _sync_time_inputs(self) -> NoReturn:
+    def _sync_time_inputs(self) -> None:
         """Refreshes the input fields to match the active session (after new/open/load)."""
         time = self.files.time
         self._set_input("framerate", time.framerate)
@@ -331,7 +309,7 @@ class App:
         self._set_input("end_loads", "0")
 
     @error_handler
-    def _new_time(self) -> NoReturn:
+    def _new_time(self) -> None:
         """Starts a blank time, first offering to save unsaved changes."""
         if not self._prompt_save_if_dirty("New Time"):
             return
@@ -341,7 +319,7 @@ class App:
         self._update_displays()
 
     @error_handler
-    def _open_time(self) -> NoReturn:
+    def _open_time(self) -> None:
         """Opens a time file, first offering to save unsaved changes."""
         if not self._prompt_save_if_dirty("Open Time"):
             return
@@ -357,7 +335,7 @@ class App:
         self._update_displays()
 
     @error_handler
-    def _save_time(self) -> NoReturn:
+    def _save_time(self) -> None:
         """Saves the time to the current file, or prompts for a path if there isn't one."""
         if not self.files.file_path:
             self._save_as_time()
@@ -367,7 +345,7 @@ class App:
         self.window.statusBar().showMessage(f"Saved to {self.files.file_path}", 3000)
 
     @error_handler
-    def _save_as_time(self) -> NoReturn:
+    def _save_as_time(self) -> None:
         """Saves the time to a new file chosen via a native file dialog."""
         path, _ = QFileDialog.getSaveFileName(
             self.window, "Save As", "", "Time Files (*.json)"
@@ -381,14 +359,14 @@ class App:
         self.window.statusBar().showMessage(f"Saved to {self.files.file_path}", 3000)
 
     @error_handler
-    def _session_history(self) -> NoReturn:
+    def _session_history(self) -> None:
         """Opens the session history and switches to the selected file, if any."""
         history = self.files.history()
         if not history:
             raise ValueError("No session history.")
 
         selected_file_path = SessionHistoryDialog(
-            history, self.language.content, self.window, self._always_on_top
+            history, self.content, self.window, self._always_on_top
         ).run()
 
         if not selected_file_path or selected_file_path == self.files.file_path:
@@ -401,7 +379,7 @@ class App:
         self._sync_time_inputs()
         self._update_displays()
 
-    def _set_always_on_top(self, enabled: bool) -> NoReturn:
+    def _set_always_on_top(self, enabled: bool) -> None:
         """Toggles whether the main window stays above all other windows.
 
         Changing window flags requires the window to be re-shown, since Qt
@@ -412,7 +390,7 @@ class App:
         win.show()
         self._always_on_top = enabled
 
-    def _check_for_updates(self) -> NoReturn:
+    def _check_for_updates(self) -> None:
         """Checks for a newer release and shows the update banner if one exists."""
         latest_version = check_for_updates()
         if latest_version:
@@ -420,7 +398,7 @@ class App:
         else:
             self.window.hide_update_banner()
 
-    def _settings(self) -> NoReturn:
+    def _settings(self) -> None:
         """Opens the settings."""
         old_settings_dict = self.settings_dict
         self.settings.open_window(self.window, self._always_on_top)
@@ -445,8 +423,8 @@ class App:
             start_time = 0
             end_time = 0
         else:
-            start_time = round(float(time.start_frame) / float(fps), time.precision)
-            end_time = round(float(time.end_frame) / float(fps), time.precision)
+            start_time = round(float(time.start_frame) / float(fps), PRECISION)
+            end_time = round(float(time.end_frame) / float(fps), PRECISION)
 
         hours, minutes, seconds, milliseconds = format_components(time.with_loads)
 
@@ -471,12 +449,12 @@ class App:
     def _frame_time(self, frame: int) -> str:
         """Formats an absolute frame position as an ISO-style timestamp."""
         time = self.files.time
-        return format_frame_time(frame, time.framerate, time.precision)
+        return format_frame_time(frame, time.framerate)
 
     def _load_duration(self, load) -> str:
         """Formats a load's duration as an ISO-style timestamp."""
         time = self.files.time
-        return format_frame_time(load.length, time.framerate, time.precision)
+        return format_frame_time(load.length, time.framerate)
 
     def _youtube_timestamp(self, frame: int) -> str:
         """Formats an absolute frame position as a YouTube chapter timestamp
@@ -526,28 +504,24 @@ class App:
 
     # ── Display updates ────────────────────────────────────────────────────────
 
-    def _update_displays(self) -> NoReturn:
+    def _update_displays(self) -> None:
         """Update time displays."""
         time = self.files.time
-        wl = self.window.findChild(ClickableLabel, "without_loads_display")
-        ld = self.window.findChild(ClickableLabel, "loads_display")
-        if wl:
+        for display, without_loads in (
+            (self.window.without_loads_display, True),
+            (self.window.loads_display, False),
+        ):
             try:
-                wl.setText(time.iso_format(True))
+                display.setText(time.iso_format(without_loads))
             except (DivisionByZero, DivisionUndefined, InvalidOperation):
-                wl.setText("00.000")
-        if ld:
-            try:
-                ld.setText(time.iso_format(False))
-            except (DivisionByZero, DivisionUndefined, InvalidOperation):
-                ld.setText("00.000")
+                display.setText("00.000")
         self._refresh_load_sidebar()
 
-    def _refresh_load_sidebar(self) -> NoReturn:
+    def _refresh_load_sidebar(self) -> None:
         """Refreshes the embedded loads sidebar to match the active session's loads."""
         time = self.files.time
         self.window.refresh_loads(
-            time.loads, time.framerate, time.precision, self.language.content
+            time.loads, time.framerate, self.content
         )
 
     def _show_error(self, message):
@@ -556,16 +530,14 @@ class App:
 
     # ── Hotkeys ─────────────────────────────────────────────────────────────────
 
-    def _apply_hotkeys(self, win, handlers: dict) -> NoReturn:
+    def _apply_hotkeys(self, win, handlers: dict) -> None:
         """Binds the user's configured key sequences to their actions.
 
-        Menu-backed actions (MENU_ACTION_IDS) get their shortcut set directly on
-        the QAction, so it also shows next to the menu entry. Everything else is a
-        plain button with no QAction behind it, so a standalone QShortcut is bound
-        to the handler instead.
+        An action with a menu entry gets its shortcut set on that QAction, so it
+        also shows next to the entry. Everything else is a plain button with no
+        QAction behind it, so a standalone QShortcut is bound to the handler.
         """
         hotkeys = self.settings_dict.get("hotkeys", DEFAULT_HOTKEYS)
-        menu_actions = win.menu_actions
 
         # Keep references alive — QShortcut is tied to its parent's lifetime, but
         # nothing else on self.window would otherwise hold onto these objects.
@@ -574,10 +546,9 @@ class App:
         for action_id, _, default in HOTKEY_ACTIONS:
             sequence = QKeySequence(hotkeys.get(action_id, default))
 
-            if action_id in MENU_ACTION_IDS:
-                action = menu_actions.get(action_id)
-                if action:
-                    action.setShortcut(sequence)
+            action = win.menu_actions.get(action_id)
+            if action:
+                action.setShortcut(sequence)
             else:
                 shortcut = QShortcut(sequence, win)
                 shortcut.activated.connect(handlers[action_id])
@@ -617,7 +588,7 @@ class App:
             "end_loads": lambda: self._set_loads("end_loads", self._get_input("end_loads")),
         }
 
-    def run(self) -> NoReturn:
+    def run(self) -> None:
         """Runs the application."""
         win = self.window
         handlers = self._action_handlers()
@@ -633,10 +604,8 @@ class App:
         self._apply_hotkeys(win, handlers)
 
         # Input fields — use editingFinished so we only validate on focus-out / Enter
-        for key in ("framerate", "start", "end", "start_loads", "end_loads"):
-            inp = win.findChild(QLineEdit, key)
-            if inp:
-                _connect(inp.editingFinished, key)
+        for key, inp in win.inputs.items():
+            _connect(inp.editingFinished, key)
 
         # Paste buttons
         for key in ("start", "end", "start_loads", "end_loads"):
@@ -654,12 +623,12 @@ class App:
         win.load_delete_requested.connect(self._on_load_deleted)
 
         # Clickable display labels
-        wl = win.findChild(ClickableLabel, "without_loads_display")
-        ld = win.findChild(ClickableLabel, "loads_display")
-        if wl:
-            wl.clicked.connect(lambda: _clipboard_set(self.files.time.iso_format(True)))
-        if ld:
-            ld.clicked.connect(lambda: _clipboard_set(self.files.time.iso_format(False)))
+        win.without_loads_display.clicked.connect(
+            lambda: _clipboard_set(self.files.time.iso_format(True))
+        )
+        win.loads_display.clicked.connect(
+            lambda: _clipboard_set(self.files.time.iso_format(False))
+        )
 
         # Show the window and start the Qt event loop
         win.show()

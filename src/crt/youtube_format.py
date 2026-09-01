@@ -23,12 +23,15 @@ module intentionally doesn't attempt.
 """
 
 # Standard library
-import json
 from decimal import Decimal as d
+from functools import lru_cache
 from typing import Optional
 
 # Third-party
 from yt_dlp import YoutubeDL
+
+# Local application
+from crt.frame_input import parse_debug_info
 
 _YDL_OPTS = {
     "quiet": True,
@@ -38,23 +41,13 @@ _YDL_OPTS = {
     "socket_timeout": 8,
 }
 
-# Keyed by (video_id, format_id) — avoids re-querying yt-dlp when debug info
-# for the same video is pasted more than once in a session (e.g. once for
-# the start frame, once for the end frame).
-_fps_cache: dict[tuple[str, str], Optional[d]] = {}
-
-
 def extract_debug_info_ids(debug_info: str) -> Optional[tuple[str, str]]:
     """Extracts (video_id, format_id) from a YouTube debug info blob.
 
     Returns None if the text isn't parseable JSON or is missing either field.
     """
-    start_pos = debug_info.find('{')
-    if start_pos == -1:
-        return None
-    try:
-        parsed = json.loads(debug_info[start_pos:])
-    except json.decoder.JSONDecodeError:
+    parsed = parse_debug_info(debug_info)
+    if parsed is None:
         return None
 
     video_id = parsed.get("docid")
@@ -64,24 +57,18 @@ def extract_debug_info_ids(debug_info: str) -> Optional[tuple[str, str]]:
     return str(video_id), str(format_id)
 
 
+@lru_cache(maxsize=None)
 def get_format_framerate(video_id: str, format_id: str) -> Optional[d]:
     """Returns the real encoded framerate for a specific YouTube video/itag.
+
+    Cached, so pasting debug info for the same video twice (start frame, end
+    frame) only queries yt-dlp once.
 
     Returns None on any failure (network error, video unavailable, itag not
     found in the format list) — callers should treat that as "couldn't be
     verified" and fall back to the user's existing framerate rather than
     blocking on it.
     """
-    key = (video_id, format_id)
-    if key in _fps_cache:
-        return _fps_cache[key]
-
-    result = _lookup_format_framerate(video_id, format_id)
-    _fps_cache[key] = result
-    return result
-
-
-def _lookup_format_framerate(video_id: str, format_id: str) -> Optional[d]:
     try:
         with YoutubeDL(_YDL_OPTS) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)

@@ -1,17 +1,20 @@
 # Standard library
-from typing import NoReturn
+import os
+from configparser import ConfigParser, ParsingError
 
 # Third-party
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QCheckBox, QComboBox, QFrame, QWidget, QSizePolicy,
+    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
+    QPushButton, QCheckBox, QComboBox, QFrame, QSizePolicy,
     QColorDialog
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QStandardPaths, Qt
 from PySide6.QtGui import QFont, QColor
 
 # Local application
 from crt.hotkeys import DEFAULT_HOTKEYS, HotkeysDialog
+from crt.language import LANGUAGE_NAMES, content_for
+from crt.popups import popup_yes_no as _popup_yes_no
 from crt.theme import DEFAULT_ACCENT_COLOR
 
 
@@ -45,46 +48,31 @@ class SettingsDialog(QDialog):
         title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         layout.addWidget(title)
 
-        # Enable updates checkbox
-        row0 = QHBoxLayout()
-        spacer0 = QWidget(); spacer0.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        row0.addWidget(spacer0)
+        form = QFormLayout()
+        form.setSpacing(8)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addLayout(form)
+
+        def label(text: str) -> QLabel:
+            lbl = QLabel(text)
+            lbl.setFont(QFont("Segoe UI", 13))
+            return lbl
+
         self.enable_updates = QCheckBox(c["Automatically Check for Updates"])
         self.enable_updates.setObjectName("enable_updates")
         self.enable_updates.setChecked(settings.get("enable_updates", True))
         self.enable_updates.setFont(QFont("Segoe UI", 12))
-        row0.addWidget(self.enable_updates)
-        layout.addLayout(row0)
+        form.addRow(self.enable_updates)
 
-        # Theme
-        row1 = QHBoxLayout()
-        row1.setSpacing(8)
-        spacer1 = QWidget(); spacer1.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        row1.addWidget(spacer1)
-        lbl_theme = QLabel(c["Theme"])
-        lbl_theme.setFont(QFont("Segoe UI", 13))
-        row1.addWidget(lbl_theme)
         self.theme = QComboBox()
         self.theme.setObjectName("theme")
         self.theme.setFont(QFont("Segoe UI", 12))
-        self.theme.addItems([c["Automatic"], c["Dark"], c["Light"]])
-        current_theme = settings.get("theme", "Automatic")
-        # Try to match stored English value to localized display
-        for i, text in enumerate([c["Automatic"], c["Dark"], c["Light"]]):
-            if text == current_theme or ["Automatic", "Dark", "Light"][i] == current_theme:
-                self.theme.setCurrentIndex(i)
-                break
-        row1.addWidget(self.theme)
-        layout.addLayout(row1)
+        # Localized label shown, English name stored as the item's data.
+        for name in ("Automatic", "Dark", "Light"):
+            self.theme.addItem(c[name], name)
+        self.theme.setCurrentIndex(max(0, self.theme.findData(settings.get("theme", "Automatic"))))
+        form.addRow(label(c["Theme"]), self.theme)
 
-        # Accent color
-        row1b = QHBoxLayout()
-        row1b.setSpacing(8)
-        spacer1b = QWidget(); spacer1b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        row1b.addWidget(spacer1b)
-        lbl_accent = QLabel(c["Accent Color"])
-        lbl_accent.setFont(QFont("Segoe UI", 13))
-        row1b.addWidget(lbl_accent)
         self._accent_color = settings.get("accent_color", DEFAULT_ACCENT_COLOR)
         self.accent_color_button = QPushButton(self._accent_color)
         self.accent_color_button.setObjectName("accent_color")
@@ -93,56 +81,27 @@ class SettingsDialog(QDialog):
         self.accent_color_button.setMinimumWidth(90)
         self.accent_color_button.clicked.connect(self._pick_accent_color)
         self._update_accent_button()
-        row1b.addWidget(self.accent_color_button)
-        layout.addLayout(row1b)
+        form.addRow(label(c["Accent Color"]), self.accent_color_button)
 
-        # Language
-        row2 = QHBoxLayout()
-        row2.setSpacing(8)
-        spacer2 = QWidget(); spacer2.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        row2.addWidget(spacer2)
-        lbl_lang = QLabel(c["Language"])
-        lbl_lang.setFont(QFont("Segoe UI", 13))
-        row2.addWidget(lbl_lang)
         self.language = QComboBox()
         self.language.setObjectName("language")
         self.language.setFont(QFont("Segoe UI", 12))
-        self.language.addItems(["English", "Español", "Français", "Polski"])
-        lang_map = {"en": "English", "es": "Español", "fr": "Français", "pl": "Polski"}
-        stored_lang = settings.get("language", "en")
-        display_lang = lang_map.get(stored_lang, stored_lang)
-        idx = self.language.findText(display_lang)
-        if idx >= 0:
-            self.language.setCurrentIndex(idx)
-        row2.addWidget(self.language)
-        layout.addLayout(row2)
+        for code, name in LANGUAGE_NAMES.items():
+            self.language.addItem(name, code)
+        self.language.setCurrentIndex(max(0, self.language.findData(settings.get("language", "en"))))
+        form.addRow(label(c["Language"]), self.language)
 
-        # Mod note format
-        row3 = QHBoxLayout()
-        row3.setSpacing(8)
-        spacer3 = QWidget(); spacer3.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        row3.addWidget(spacer3)
-        lbl_mod = QLabel(c["Mod Note Format"])
-        lbl_mod.setFont(QFont("Segoe UI", 13))
-        row3.addWidget(lbl_mod)
         self.mod_note_format = QLineEdit(settings.get("mod_note_format", ""))
         self.mod_note_format.setObjectName("mod_note_format")
         self.mod_note_format.setFont(QFont("Segoe UI", 11))
         self.mod_note_format.setMinimumWidth(220)
-        row3.addWidget(self.mod_note_format)
-        layout.addLayout(row3)
+        form.addRow(label(c["Mod Note Format"]), self.mod_note_format)
 
-        # Hotkeys
-        row4 = QHBoxLayout()
-        row4.setSpacing(8)
-        spacer4 = QWidget(); spacer4.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        row4.addWidget(spacer4)
         self.btn_hotkeys = QPushButton(c.get("Customize Hotkeys", "Customize Hotkeys") + "...")
         self.btn_hotkeys.setObjectName("Customize Hotkeys")
         self.btn_hotkeys.setFont(QFont("Segoe UI", 12))
         self.btn_hotkeys.clicked.connect(self._open_hotkeys_dialog)
-        row4.addWidget(self.btn_hotkeys)
-        layout.addLayout(row4)
+        form.addRow(self.btn_hotkeys)
 
         # Separator
         sep = QFrame()
@@ -170,7 +129,7 @@ class SettingsDialog(QDialog):
         self.btn_apply.clicked.connect(self.accept)
         self.btn_cancel.clicked.connect(self.reject)
 
-    def _update_accent_button(self) -> NoReturn:
+    def _update_accent_button(self) -> None:
         """Refreshes the accent color button's swatch color, label, and text contrast."""
         color = QColor(self._accent_color)
         # Standard relative luminance threshold for picking readable text on a color swatch.
@@ -183,14 +142,14 @@ class SettingsDialog(QDialog):
         )
         self.accent_color_button.adjustSize()
 
-    def _pick_accent_color(self) -> NoReturn:
+    def _pick_accent_color(self) -> None:
         """Opens a hex color picker dialog and stores the chosen accent color."""
         color = QColorDialog.getColor(QColor(self._accent_color), self, "Select Accent Color")
         if color.isValid():
             self._accent_color = color.name()
             self._update_accent_button()
 
-    def _open_hotkeys_dialog(self) -> NoReturn:
+    def _open_hotkeys_dialog(self) -> None:
         """Opens the hotkeys rebinding dialog and stores the result if confirmed."""
         dialog = HotkeysDialog(self._hotkeys, self.content, self, self._on_top)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -200,10 +159,100 @@ class SettingsDialog(QDialog):
         """Returns current widget values as a dict compatible with the Settings controller."""
         return {
             "enable_updates": self.enable_updates.isChecked(),
-            "theme": self.theme.currentText(),
+            "theme": self.theme.currentData(),
             "accent_color": self._accent_color,
-            "language": self.language.currentText(),
+            "language": self.language.currentData(),
             "mod_note_format": self.mod_note_format.text(),
             "hotkeys": self._hotkeys,
         }
 
+
+class Settings:
+    """Settings for CRT."""
+
+    def __init__(self) -> None:
+        """Initializes the Settings class."""
+        self.file_path = os.path.join(
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation),
+            "settings.ini"
+        )
+        self.defaults = {
+            "Settings": {
+                "enable_updates": "True",
+                "theme": "Automatic",
+                "accent_color": DEFAULT_ACCENT_COLOR,
+                "language": "en",
+                "mod_note_format": "Mod Note: Retimed to {time_without_loads}",
+            },
+            "Hotkeys": DEFAULT_HOTKEYS,
+        }
+
+        # Defaults first, then the file on top of them: anything the user has
+        # never set (or a key added in a later version) just falls through.
+        self.config = ConfigParser()
+        self.config.read_dict(self.defaults)
+        try:
+            self.config.read(self.file_path)
+        except ParsingError:
+            pass  # Hand-edited into a corrupt state: start from defaults instead.
+
+        self.content = content_for(self.config.get("Settings", "language"))
+
+    def _restore_defaults(self, parent=None, on_top: bool = False) -> None:
+        """Restores the settings back to the defaults. Persisted on Apply."""
+        if not _popup_yes_no(
+            "Restore Defaults", "Are you sure you want to restore the default settings?",
+            parent, on_top
+        ):
+            return
+
+        self.config = ConfigParser()
+        self.config.read_dict(self.defaults)
+
+    def _apply(self, values: dict) -> None:
+        """Applies the settings.
+
+        Args:
+            values (dict): The values from the settings window.
+        """
+        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        with open(self.file_path, "w") as file:
+            self.config.set("Settings", "enable_updates", str(values["enable_updates"]))
+            self.config.set("Settings", "theme", str(values["theme"]))
+            self.config.set("Settings", "accent_color", str(values["accent_color"]))
+            self.config.set("Settings", "language", str(values["language"]))
+            self.config.set("Settings", "mod_note_format", str(values["mod_note_format"]))
+
+            for action_id, shortcut in values.get("hotkeys", {}).items():
+                self.config.set("Hotkeys", action_id, str(shortcut))
+
+            self.config.write(file)
+
+    def config_to_dict(self) -> dict:
+        """Converts the settings into a dictionary."""
+        return {
+            "enable_updates": self.config.getboolean("Settings", "enable_updates"),
+            "theme": self.config.get("Settings", "theme"),
+            "accent_color": self.config.get("Settings", "accent_color"),
+            "language": self.config.get("Settings", "language"),
+            "mod_note_format": self.config.get("Settings", "mod_note_format"),
+            "hotkeys": {
+                action_id: self.config.get("Hotkeys", action_id)
+                for action_id in DEFAULT_HOTKEYS
+            },
+        }
+
+    def open_window(self, parent=None, on_top: bool = False) -> None:
+        """Opens the settings window."""
+        while True:
+            dialog = SettingsDialog(self.config_to_dict(), self.content, parent, on_top)
+            result = dialog.exec()
+
+            if result == RESTORE_DEFAULTS:
+                # Re-open with fresh defaults.
+                self._restore_defaults(parent, on_top)
+                continue
+
+            if result == QDialog.DialogCode.Accepted:
+                self._apply(dialog.get_values())
+            return
