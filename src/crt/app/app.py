@@ -13,7 +13,7 @@ from PySide6.QtGui import QAction, QGuiApplication, QIcon, QKeySequence, QShortc
 
 # Local application
 from crt._version import __version__
-from crt.app.gui import ClickableLabel, MainGUI
+from crt.app.gui import ClickableLabel, MainWindow
 from crt.app_settings.app import Settings
 from crt.decorators import error_handler, format_components, format_frame_time
 from crt.file_manager import FileManager
@@ -23,7 +23,7 @@ from crt.popups import (
     popup_yes_no as _popup_yes_no, popup_yes_no_cancel as _popup_yes_no_cancel,
     popup_ok as _popup_ok, popup_error as _popup_error
 )
-from crt.session_history import SessionHistory
+from crt.session_history import SessionHistoryDialog
 from crt.theme import stylesheet_for
 from crt.updater import check_for_updates, open_releases_page
 from crt.youtube_format import extract_debug_info_ids, get_format_framerate
@@ -86,9 +86,9 @@ class App:
         self._apply_theme(self.settings_dict["theme"], self.settings_dict["accent_color"])
 
         self.language = self.settings.language
-        self.window = MainGUI(self.language.content)
+        self.window = MainWindow(self.language.content)
         if Path(icon_path).exists():
-            self.window.window.setWindowIcon(QIcon(icon_path))
+            self.window.setWindowIcon(QIcon(icon_path))
 
         # Enabled by default. Set the flag directly rather than via
         # _set_always_on_top(), which calls win.show() to reapply the flag on an
@@ -96,10 +96,10 @@ class App:
         # window and shows it, would flash a blank window while startup work
         # (e.g. the update check below) is still blocking.
         self._always_on_top = True
-        self.window.window.action_always_on_top.setChecked(True)
-        self.window.window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.window.action_always_on_top.setChecked(True)
+        self.window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
 
-        self.window.window.update_link_clicked.connect(open_releases_page)
+        self.window.update_link_clicked.connect(open_releases_page)
 
         if self.settings_dict["enable_updates"]:
             self._check_for_updates()
@@ -153,7 +153,7 @@ class App:
             if (end_frame - start_frame) > self._load_stats['avg_length'] * 10:
                 if not _popup_yes_no(
                     "Woah!", "This load is concerningly long. Would you like to add the load anyway?",
-                    self.window.window, self._always_on_top
+                    self.window, self._always_on_top
                 ):
                     return
 
@@ -162,7 +162,7 @@ class App:
         self._set_input("start_loads", "0")
         self._set_input("end_loads", "0")
         self._update_displays()
-        _popup_ok("Loads", "Load added successfully.", self.window.window, self._always_on_top)
+        _popup_ok("Loads", "Load added successfully.", self.window, self._always_on_top)
 
     # ── Input parsing helpers ──────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ class App:
             "Framerate Mismatch",
             f"This video appears to be {detected_fps} FPS, but the session is set to "
             f"{current_fps} FPS.\n\nUpdate the framerate before calculating the frame?",
-            self.window.window, self._always_on_top
+            self.window, self._always_on_top
         ):
             self._set_framerate(str(detected_fps))
 
@@ -214,7 +214,7 @@ class App:
 
     def _set_input(self, key: str, value: str):
         """Updates a QLineEdit in the main window by object name."""
-        widget = self.window.window.findChild(QLineEdit, key)
+        widget = self.window.findChild(QLineEdit, key)
         if widget:
             widget.blockSignals(True)
             widget.setText(str(value))
@@ -222,7 +222,7 @@ class App:
 
     def _get_input(self, key: str) -> str:
         """Gets the text of a QLineEdit in the main window by object name."""
-        widget = self.window.window.findChild(QLineEdit, key)
+        widget = self.window.findChild(QLineEdit, key)
         return widget.text() if widget else ""
 
     # ── Input event handlers ───────────────────────────────────────────────────
@@ -278,7 +278,7 @@ class App:
 
         choice = _popup_yes_no_cancel(
             title, "Would you like to save the current time first?",
-            self.window.window, self._always_on_top
+            self.window, self._always_on_top
         )
         if choice == "cancel":
             return False
@@ -314,7 +314,7 @@ class App:
             return
 
         new_file_path, _ = QFileDialog.getOpenFileName(
-            self.window.window, "Open Time", "", "Time Files (*.json)"
+            self.window, "Open Time", "", "Time Files (*.json)"
         )
         if not new_file_path or new_file_path == self.files.file_path:
             return
@@ -331,13 +331,13 @@ class App:
             return
 
         self.files.save()
-        self.window.window.statusBar().showMessage(f"Saved to {self.files.file_path}", 3000)
+        self.window.statusBar().showMessage(f"Saved to {self.files.file_path}", 3000)
 
     @error_handler
     def _save_as_time(self) -> NoReturn:
         """Saves the time to a new file chosen via a native file dialog."""
         path, _ = QFileDialog.getSaveFileName(
-            self.window.window, "Save As", "", "Time Files (*.json)"
+            self.window, "Save As", "", "Time Files (*.json)"
         )
         if not path:
             return
@@ -345,15 +345,18 @@ class App:
             path += ".json"
 
         self.files.save_as(path)
-        self.window.window.statusBar().showMessage(f"Saved to {self.files.file_path}", 3000)
+        self.window.statusBar().showMessage(f"Saved to {self.files.file_path}", 3000)
 
     @error_handler
     def _session_history(self) -> NoReturn:
         """Opens the session history and switches to the selected file, if any."""
-        session_history = SessionHistory(
-            self.language, self.files.history(), self.window.window, self._always_on_top
-        )
-        selected_file_path = session_history.run()
+        history = self.files.history()
+        if not history:
+            raise ValueError("No session history.")
+
+        selected_file_path = SessionHistoryDialog(
+            history, self.language.content, self.window, self._always_on_top
+        ).run()
 
         if not selected_file_path or selected_file_path == self.files.file_path:
             return
@@ -371,7 +374,7 @@ class App:
         Changing window flags requires the window to be re-shown, since Qt
         hides it as a side effect of applying the new flags.
         """
-        win = self.window.window
+        win = self.window
         win.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
         win.show()
         self._always_on_top = enabled
@@ -380,20 +383,20 @@ class App:
         """Checks for a newer release and shows the update banner if one exists."""
         latest_version = check_for_updates()
         if latest_version:
-            self.window.window.show_update_banner(latest_version)
+            self.window.show_update_banner(latest_version)
         else:
-            self.window.window.hide_update_banner()
+            self.window.hide_update_banner()
 
     def _settings(self) -> NoReturn:
         """Opens the settings."""
         old_settings_dict = self.settings_dict
-        self.settings.open_window(self.window.window, self._always_on_top)
+        self.settings.open_window(self.window, self._always_on_top)
         self.settings_dict = self.settings.config_to_dict()
 
         if self.settings_dict != old_settings_dict:
             _popup_ok(
                 "Settings", "Please restart the application to apply the changes.",
-                self.window.window, self._always_on_top
+                self.window, self._always_on_top
             )
 
     # ── Mod note ───────────────────────────────────────────────────────────────
@@ -493,8 +496,8 @@ class App:
     def _update_displays(self) -> NoReturn:
         """Update time displays."""
         time = self.files.time
-        wl = self.window.window.findChild(ClickableLabel, "without_loads_display")
-        ld = self.window.window.findChild(ClickableLabel, "loads_display")
+        wl = self.window.findChild(ClickableLabel, "without_loads_display")
+        ld = self.window.findChild(ClickableLabel, "loads_display")
         if wl:
             try:
                 wl.setText(time.iso_format(True))
@@ -510,13 +513,13 @@ class App:
     def _refresh_load_sidebar(self) -> NoReturn:
         """Refreshes the embedded loads sidebar to match the active session's loads."""
         time = self.files.time
-        self.window.window.refresh_loads(
+        self.window.refresh_loads(
             time.loads, time.framerate, time.precision, self.language.content
         )
 
     def _show_error(self, message):
         """Shows a popup message of the error."""
-        _popup_error("Error", message, self.window.window, self._always_on_top)
+        _popup_error("Error", message, self.window, self._always_on_top)
 
     def _get_all_values(self) -> dict:
         """Reads all input values from the main window."""
@@ -560,7 +563,7 @@ class App:
 
     def run(self) -> NoReturn:
         """Runs the application."""
-        win = self.window.window
+        win = self.window
 
         def _on_menu_action(action):
             key = action.data()
@@ -611,7 +614,7 @@ class App:
 
         # On exit, offer to save unsaved changes
         if self.files.dirty and _popup_yes_no(
-            "Exit", "Would you like to save?", self.window.window, self._always_on_top
+            "Exit", "Would you like to save?", self.window, self._always_on_top
         ):
             self._save_time()
 
@@ -635,7 +638,7 @@ class App:
                 self.files.dirty = True
                 self._update_displays()
             case "Always on Top":
-                self._set_always_on_top(self.window.window.action_always_on_top.isChecked())
+                self._set_always_on_top(self.window.action_always_on_top.isChecked())
             case "About":
                 _popup_ok(
                     "About",
@@ -644,7 +647,7 @@ class App:
                     "Credits:\nMenzo: French and Polish Translations\n"
                     "AmazinCris: Spanish Translations\n\n"
                     "© 2026 Conner Glover",
-                    self.window.window, self._always_on_top
+                    self.window, self._always_on_top
                 )
             case "Add Loads":
                 self._add_loads(values)
@@ -682,7 +685,7 @@ class App:
             case "end_loads":
                 self._set_loads("end_loads", values.get("end_loads", ""))
             case "Exit":
-                self.window.window.close()
+                self.window.close()
             case _ as e:
                 print(f"Unhandled event: {e}")
 

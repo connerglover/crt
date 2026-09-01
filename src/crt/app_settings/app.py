@@ -5,10 +5,11 @@ from typing import NoReturn, Optional
 
 # Third-party
 import appdirs
+from PySide6.QtWidgets import QDialog
 
 # Local application
 from crt.language import Language
-from crt.app_settings.gui import SettingsGUI
+from crt.app_settings.gui import RESTORE_DEFAULTS, SettingsDialog
 from crt.hotkeys import DEFAULT_HOTKEYS, HOTKEY_OPTION_NAMES
 from crt.popups import popup_yes_no as _popup_yes_no
 from crt.theme import DEFAULT_ACCENT_COLOR
@@ -148,25 +149,15 @@ class Settings:
 
     def open_window(self, parent=None, on_top: bool = False) -> NoReturn:
         """Opens the settings window."""
-        settings = self.config_to_dict()
-        self.window = SettingsGUI(settings, self.language.content, parent, on_top)
-
         while True:
-            event, values = self.window.read()
+            dialog = SettingsDialog(self.config_to_dict(), self.language.content, parent, on_top)
+            result = dialog.exec()
 
-            match event:
-                case "Restore Defaults":
-                    self._restore_defaults(True, parent, on_top)
-                    # Re-open with fresh defaults
-                    self.window.close()
-                    settings = self.config_to_dict()
-                    self.window = SettingsGUI(settings, self.language.content, parent, on_top)
+            if result == RESTORE_DEFAULTS:
+                # Re-open with fresh defaults.
+                self._restore_defaults(True, parent, on_top)
+                continue
 
-                case "Apply":
-                    self._apply(values)
-                    break
-
-                case "Cancel" | None:
-                    break
-
-        self.window.close()
+            if result == QDialog.DialogCode.Accepted:
+                self._apply(dialog.get_values())
+            return

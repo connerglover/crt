@@ -11,9 +11,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
 
 # Local application
-from crt.base_gui import BaseGUI
 from crt.hotkeys import DEFAULT_HOTKEYS, HotkeysDialog
 from crt.theme import DEFAULT_ACCENT_COLOR
+
+
+RESTORE_DEFAULTS = 2  # Custom QDialog.done() code, alongside Accepted/Rejected.
 
 
 class SettingsDialog(QDialog):
@@ -164,6 +166,10 @@ class SettingsDialog(QDialog):
             btn_row.addWidget(btn)
         layout.addLayout(btn_row)
 
+        self.btn_restore.clicked.connect(lambda: self.done(RESTORE_DEFAULTS))
+        self.btn_apply.clicked.connect(self.accept)
+        self.btn_cancel.clicked.connect(self.reject)
+
     def _update_accent_button(self) -> NoReturn:
         """Refreshes the accent color button's swatch color, label, and text contrast."""
         color = QColor(self._accent_color)
@@ -201,16 +207,3 @@ class SettingsDialog(QDialog):
             "hotkeys": self._hotkeys,
         }
 
-
-class SettingsGUI(BaseGUI):
-    """Wrapper around SettingsDialog to match the BaseGUI interface."""
-
-    def __init__(self, settings: dict, content: dict, parent=None, on_top: bool = False):
-        self.window = SettingsDialog(settings, content, parent, on_top)
-        self._connect_signals()
-
-    def _connect_signals(self):
-        d = self.window
-        d.btn_restore.clicked.connect(lambda: self._emit("Restore Defaults", self.window.get_values()))
-        d.btn_apply.clicked.connect(lambda: self._emit("Apply", self.window.get_values()))
-        d.btn_cancel.clicked.connect(lambda: self._emit("Cancel", self.window.get_values()))

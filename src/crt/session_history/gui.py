@@ -8,9 +8,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-# Local application
-from crt.base_gui import BaseGUI
-
 
 class SessionHistoryDialog(QDialog):
     """Session history dialog for CRT."""
@@ -29,29 +26,25 @@ class SessionHistoryDialog(QDialog):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
+        self._selected = None
         self.list_widget = QListWidget()
         self.list_widget.setObjectName("session_history")
         self.list_widget.setFont(QFont("Segoe UI", 12))
         for path in past_file_paths:
             self.list_widget.addItem(QListWidgetItem(path))
         layout.addWidget(self.list_widget)
+        self.list_widget.itemActivated.connect(self._pick)
+        self.list_widget.itemDoubleClicked.connect(self._pick)
 
-    def get_selected(self):
-        items = self.list_widget.selectedItems()
-        return [item.text() for item in items]
+    def _pick(self, item: QListWidgetItem) -> NoReturn:
+        """Accepts the dialog with the double-clicked/activated path."""
+        self._selected = item.text()
+        self.accept()
 
+    def run(self) -> str:
+        """Shows the dialog modally.
 
-class SessionHistoryGUI(BaseGUI):
-    """Wrapper around SessionHistoryDialog to match the BaseGUI/event-loop interface."""
-
-    def __init__(self, past_file_paths: list, content: dict, parent=None, on_top: bool = False):
-        self.window = SessionHistoryDialog(past_file_paths, content, parent, on_top)
-        self._connect_signals()
-
-    def _connect_signals(self):
-        self.window.list_widget.itemDoubleClicked.connect(
-            lambda item: self._emit("session_history", {"session_history": [item.text()]})
-        )
-        self.window.list_widget.itemActivated.connect(
-            lambda item: self._emit("session_history", {"session_history": [item.text()]})
-        )
+        Returns:
+            str: The selected file path, or None if cancelled.
+        """
+        return self._selected if self.exec() == QDialog.DialogCode.Accepted else None

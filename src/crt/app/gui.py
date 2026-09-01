@@ -11,7 +11,6 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
 
 # Local application
-from crt.base_gui import BaseGUI
 from crt.decorators import format_frame_time
 
 
@@ -578,10 +577,3 @@ class MainWindow(QMainWindow):
             row.addWidget(paste_btn)
 
         return row
-
-
-class MainGUI(BaseGUI):
-    """Main window for CRT."""
-
-    def __init__(self, content: dict):
-        self.window = MainWindow(content)
