@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QApplication, QFileDialog, QLineEdit, QPushButton
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QGuiApplication, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QShortcut
 
 # Local application
 from crt._version import __version__
@@ -136,10 +136,10 @@ class App:
         self._update_displays()
 
     @error_handler
-    def _add_loads(self, values: dict) -> NoReturn:
+    def _add_loads(self) -> NoReturn:
         """Adds the loads."""
-        start_frame = int(values.get("start_loads") or 0)
-        end_frame = int(values.get("end_loads") or 0)
+        start_frame = int(self._get_input("start_loads") or 0)
+        end_frame = int(self._get_input("end_loads") or 0)
         time = self.files.time
 
         if time.loads:
@@ -163,6 +163,39 @@ class App:
         self._set_input("end_loads", "0")
         self._update_displays()
         _popup_ok("Loads", "Load added successfully.", self.window, self._always_on_top)
+
+    def _clear_loads(self) -> NoReturn:
+        """Clears every load from the active session."""
+        self.files.time.clear_loads()
+        self.files.dirty = True
+        self._update_displays()
+
+    @error_handler
+    def _copy_mod_note(self) -> NoReturn:
+        """Copies the mod note to the clipboard."""
+        _clipboard_set(self._mod_note)
+
+    @error_handler
+    def _copy_discord_message(self) -> NoReturn:
+        """Copies the Discord summary to the clipboard."""
+        _clipboard_set(self._discord_message)
+
+    @error_handler
+    def _copy_youtube_chapters(self) -> NoReturn:
+        """Copies the YouTube chapters list to the clipboard."""
+        _clipboard_set(self._youtube_chapters)
+
+    def _about(self) -> NoReturn:
+        """Shows the about popup."""
+        _popup_ok(
+            "About",
+            f"Conner's Retime Tool v{__version__}\n\n"
+            "Created by Conner Glover\n\n"
+            "Credits:\nMenzo: French and Polish Translations\n"
+            "AmazinCris: Spanish Translations\n\n"
+            "© 2026 Conner Glover",
+            self.window, self._always_on_top
+        )
 
     # ── Input parsing helpers ──────────────────────────────────────────────────
 
@@ -521,27 +554,18 @@ class App:
         """Shows a popup message of the error."""
         _popup_error("Error", message, self.window, self._always_on_top)
 
-    def _get_all_values(self) -> dict:
-        """Reads all input values from the main window."""
-        return {
-            key: self._get_input(key)
-            for key in ("framerate", "start", "end", "start_loads", "end_loads")
-        }
-
     # ── Hotkeys ─────────────────────────────────────────────────────────────────
 
-    def _apply_hotkeys(self, win) -> NoReturn:
+    def _apply_hotkeys(self, win, handlers: dict) -> NoReturn:
         """Binds the user's configured key sequences to their actions.
 
         Menu-backed actions (MENU_ACTION_IDS) get their shortcut set directly on
-        the QAction, via win.menu_bar_actions(), so it also shows next to the menu
-        entry and so the Copy Mod Note dropdown's duplicate QAction doesn't also
-        receive it (which would make Qt treat the shortcut as ambiguous). Everything
-        else is a plain button with no QAction behind it, so a standalone QShortcut
-        is bound instead and dispatched the same way a QAction trigger would be.
+        the QAction, so it also shows next to the menu entry. Everything else is a
+        plain button with no QAction behind it, so a standalone QShortcut is bound
+        to the handler instead.
         """
         hotkeys = self.settings_dict.get("hotkeys", DEFAULT_HOTKEYS)
-        menu_actions = win.menu_bar_actions()
+        menu_actions = win.menu_actions
 
         # Keep references alive — QShortcut is tied to its parent's lifetime, but
         # nothing else on self.window would otherwise hold onto these objects.
@@ -556,45 +580,74 @@ class App:
                     action.setShortcut(sequence)
             else:
                 shortcut = QShortcut(sequence, win)
-                shortcut.activated.connect(lambda k=action_id: self._dispatch(k, self._get_all_values()))
+                shortcut.activated.connect(handlers[action_id])
                 self._hotkey_shortcuts.append(shortcut)
 
     # ── Main event loop ────────────────────────────────────────────────────────
 
+    def _action_handlers(self) -> dict:
+        """Maps every action id to the handler it fires.
+
+        Keys match MainWindow.menu_actions and the ids in HOTKEY_ACTIONS, so a
+        menu entry, its button and its shortcut all bind to the same callable.
+        """
+        return {
+            "New Time": self._new_time,
+            "Open Time": self._open_time,
+            "Session History": self._session_history,
+            "Save": self._save_time,
+            "Save As": self._save_as_time,
+            "Settings": self._settings,
+            "Exit": self.window.close,
+            "About": self._about,
+            "Always on Top": lambda: self._set_always_on_top(self.window.action_always_on_top.isChecked()),
+            "Copy Mod Note": self._copy_mod_note,
+            "Copy Discord Message": self._copy_discord_message,
+            "Copy YouTube Chapters": self._copy_youtube_chapters,
+            "Add Loads": self._add_loads,
+            "Clear Loads": self._clear_loads,
+            "start_paste": lambda: self._set_time("start", _clipboard_get()),
+            "end_paste": lambda: self._set_time("end", _clipboard_get()),
+            "start_loads_paste": lambda: self._set_loads("start_loads", _clipboard_get()),
+            "end_loads_paste": lambda: self._set_loads("end_loads", _clipboard_get()),
+            "framerate": lambda: self._set_framerate(self._get_input("framerate")),
+            "start": lambda: self._set_time("start", self._get_input("start")),
+            "end": lambda: self._set_time("end", self._get_input("end")),
+            "start_loads": lambda: self._set_loads("start_loads", self._get_input("start_loads")),
+            "end_loads": lambda: self._set_loads("end_loads", self._get_input("end_loads")),
+        }
+
     def run(self) -> NoReturn:
         """Runs the application."""
         win = self.window
+        handlers = self._action_handlers()
 
-        def _on_menu_action(action):
-            key = action.data()
-            self._dispatch(key, self._get_all_values())
+        # Signals pass a `checked` bool that the handlers don't take, hence the lambda.
+        def _connect(signal, key):
+            signal.connect(lambda checked=False, h=handlers[key]: h())
 
-        # Connect all QActions from all menus
-        for action in win.findChildren(QAction):
-            action.triggered.connect(lambda checked=False, a=action: _on_menu_action(a))
+        for key, action in win.menu_actions.items():
+            _connect(action.triggered, key)
 
         # Customizable keyboard shortcuts (Settings > Customize Hotkeys)
-        self._apply_hotkeys(win)
+        self._apply_hotkeys(win, handlers)
 
         # Input fields — use editingFinished so we only validate on focus-out / Enter
-        # but also connect textEdited for live load-field cleaning
         for key in ("framerate", "start", "end", "start_loads", "end_loads"):
             inp = win.findChild(QLineEdit, key)
             if inp:
-                inp.editingFinished.connect(
-                    lambda k=key: self._dispatch(k, {k: self._get_input(k)})
-                )
+                _connect(inp.editingFinished, key)
 
         # Paste buttons
         for key in ("start", "end", "start_loads", "end_loads"):
             btn = win.findChild(QPushButton, f"{key}_paste")
             if btn:
-                btn.clicked.connect(lambda checked=False, k=key: self._dispatch(f"{k}_paste", {}))
+                _connect(btn.clicked, f"{key}_paste")
 
         # Action buttons
-        win.btn_copy_mod_note.clicked.connect(lambda: self._dispatch("Copy Mod Note", {}))
-        win.btn_add_loads.clicked.connect(lambda: self._dispatch("Add Loads", self._get_all_values()))
-        win.btn_clear_loads.clicked.connect(lambda: self._dispatch("Clear Loads", {}))
+        _connect(win.btn_copy_mod_note.clicked, "Copy Mod Note")
+        _connect(win.btn_add_loads.clicked, "Add Loads")
+        _connect(win.btn_clear_loads.clicked, "Clear Loads")
 
         # Embedded loads sidebar — live inline editing, no modal dialog
         win.load_edited.connect(self._on_load_edited)
@@ -617,76 +670,3 @@ class App:
             "Exit", "Would you like to save?", self.window, self._always_on_top
         ):
             self._save_time()
-
-    def _dispatch(self, event: str, values: dict):
-        """Dispatches an event to the appropriate handler."""
-        match event:
-            case "New Time":
-                self._new_time()
-            case "Open Time":
-                self._open_time()
-            case "Session History":
-                self._session_history()
-            case "Save":
-                self._save_time()
-            case "Save As":
-                self._save_as_time()
-            case "Settings":
-                self._settings()
-            case "Clear Loads":
-                self.files.time.clear_loads()
-                self.files.dirty = True
-                self._update_displays()
-            case "Always on Top":
-                self._set_always_on_top(self.window.action_always_on_top.isChecked())
-            case "About":
-                _popup_ok(
-                    "About",
-                    f"Conner's Retime Tool v{__version__}\n\n"
-                    "Created by Conner Glover\n\n"
-                    "Credits:\nMenzo: French and Polish Translations\n"
-                    "AmazinCris: Spanish Translations\n\n"
-                    "© 2026 Conner Glover",
-                    self.window, self._always_on_top
-                )
-            case "Add Loads":
-                self._add_loads(values)
-            case "Copy Mod Note":
-                try:
-                    _clipboard_set(self._mod_note)
-                except Exception as e:
-                    self._show_error(e)
-            case "Copy Discord Message":
-                try:
-                    _clipboard_set(self._discord_message)
-                except Exception as e:
-                    self._show_error(e)
-            case "Copy YouTube Chapters":
-                try:
-                    _clipboard_set(self._youtube_chapters)
-                except Exception as e:
-                    self._show_error(e)
-            case "start_paste":
-                self._set_time("start", _clipboard_get())
-            case "end_paste":
-                self._set_time("end", _clipboard_get())
-            case "start_loads_paste":
-                self._set_loads("start_loads", _clipboard_get())
-            case "end_loads_paste":
-                self._set_loads("end_loads", _clipboard_get())
-            case "framerate":
-                self._set_framerate(values.get("framerate", ""))
-            case "start":
-                self._set_time("start", values.get("start", ""))
-            case "end":
-                self._set_time("end", values.get("end", ""))
-            case "start_loads":
-                self._set_loads("start_loads", values.get("start_loads", ""))
-            case "end_loads":
-                self._set_loads("end_loads", values.get("end_loads", ""))
-            case "Exit":
-                self.window.close()
-            case _ as e:
-                print(f"Unhandled event: {e}")
-
-        self._update_displays()

@@ -8,7 +8,10 @@ sys.path.insert(0, "src")
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
+from crt.app.app import App
+from crt.app.gui import MainWindow
 from crt.app_settings.gui import RESTORE_DEFAULTS, SettingsDialog
+from crt.hotkeys import HOTKEY_ACTIONS
 from crt.language import Language
 from crt.session_history.gui import SessionHistoryDialog
 
@@ -32,5 +35,12 @@ for button, expected in (("btn_apply", 1), ("btn_cancel", 0), ("btn_restore", RE
     QTimer.singleShot(0, getattr(dialog, button).click)
     assert dialog.exec() == expected, button
     assert dialog.get_values()["accent_color"] == "#ff0000"
+
+# Every menu entry and hotkey binds to a real handler.
+app_obj = App.__new__(App)
+app_obj.window = MainWindow(content)
+handlers = app_obj._action_handlers()
+assert set(app_obj.window.menu_actions) <= set(handlers), set(app_obj.window.menu_actions) - set(handlers)
+assert {action_id for action_id, _, _ in HOTKEY_ACTIONS} <= set(handlers)
 
 print("ok")
